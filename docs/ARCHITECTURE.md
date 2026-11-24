@@ -33,6 +33,7 @@ SQLite file (one local database)
 | `index.py` | Schema, extraction, incremental `ingest`, stale-data cleanup, BM25 `search`, `citation` |
 | `embeddings.py` | Ollama embedder, `embed_index`, `vector_search`, `hybrid_search` (RRF) |
 | `ollama.py` | Ollama host validation (loopback only by default) and answer generation |
+| `serve.py` | Local read-only web interface (`serve`): loopback-only stdlib HTTP server, JSON API over `search`/`search_files`, single-page UI |
 | `cli.py` | Argument parsing, text and `--json` output |
 | `eval.py` | Recall@k and MRR over `eval/questions.json` |
 

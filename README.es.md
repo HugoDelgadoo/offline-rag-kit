@@ -70,7 +70,12 @@ offline-rag [--db RUTA] [--json] search "TÉRMINOS" [--limit 5] [--mode lexical|
 offline-rag [--db RUTA] [--json] embed [--model bge-m3] [--rebuild] [--ollama-host URL] [--allow-remote]
 offline-rag [--db RUTA] [--json] ask "PREGUNTA" [--limit 5] [--model llama3.2]
                                      [--ollama-host URL] [--allow-remote]
+offline-rag [--db RUTA] serve [--port 8765] [--open]
 ```
+
+### Interfaz web
+
+`offline-rag serve --open` abre una pequeña página **de solo lectura** en `http://127.0.0.1:8765/` donde escribes palabras y ves los fragmentos (con las palabras resaltadas) o la lista de archivos. Solo escucha en tu propio ordenador (`127.0.0.1`; no hay opción para exponerla), nunca modifica el índice ni tus documentos y no necesita paquetes extra. Indexa antes tu carpeta con `ingest`. Pulsa Ctrl+C para detenerla.
 
 ### ¿Qué archivos contienen una palabra?
 
