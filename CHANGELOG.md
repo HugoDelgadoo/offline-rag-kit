@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
+## [Unreleased]
+
+### Changed
+- The default index is now a fixed per-user file (`%LOCALAPPDATA%\offline-rag\index.sqlite3` on Windows, `~/Library/Application Support/offline-rag/` on macOS, `$XDG_DATA_HOME` or `~/.local/share/offline-rag/` on Linux) instead of `.offline-rag/` in the current folder, so `search` works from any directory. `--db` and the new `OFFLINE_RAG_DB` variable override it. An index left in `.offline-rag/` of the current folder is still used, with a hint, until a fixed-location index exists.
+
 ## [0.1.4] - 2026-11-24
 
 ### Added

@@ -43,12 +43,13 @@ offline-rag search "retention policy"
 ### Use it from any terminal, and where the index lives
 
 - **Install once, use anywhere:** `pipx install offline-rag-kit` makes the `offline-rag` command available in every terminal. With plain `pip` inside a virtual environment it only works while that environment is active. If your terminal says `offline-rag` is not recognized, Python's scripts folder is not on your `PATH`; `pipx ensurepath` fixes that.
-- **The index is saved in the folder where you run the command**, as `.offline-rag/index.sqlite3`. If you index in one folder and search from another, the second folder has no index and finds nothing. To always use the same index, give a fixed path with `--db`:
+- **The index lives in one fixed folder per user**, so it works from any directory: `%LOCALAPPDATA%\offline-rag\index.sqlite3` on Windows, `~/Library/Application Support/offline-rag/` on macOS, `~/.local/share/offline-rag/` on Linux. Run `offline-rag --json ingest FOLDER` to see the exact path (`database`). To use another file, pass `--db PATH` or set `OFFLINE_RAG_DB`:
 
 ```powershell
 offline-rag --db C:\Users\You\my-index.sqlite3 ingest C:\Users\You\Documents
-offline-rag --db C:\Users\You\my-index.sqlite3 search "policy"
 ```
+
+- If you used an older version, an index in `.offline-rag/` inside the current folder is still used (with a hint) until a fixed-location index exists; move the file to the new location to use it from anywhere.
 
 To ask questions using a local model, first [install Ollama](https://ollama.com/) and pull a model:
 

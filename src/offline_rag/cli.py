@@ -2,18 +2,55 @@
 
 import argparse
 import json
+import os
 import sys
+from pathlib import Path
 
 from .embeddings import DEFAULT_MODEL, embed_index, hybrid_search, indexed_model, ollama_embedder, vector_search
 from .index import citation, ingest, search, search_files
 from .ollama import answer_with_ollama
+
+LEGACY_DB = Path(".offline-rag") / "index.sqlite3"
+
+
+def default_db_path() -> Path:
+    """Fixed per-user index location, so the index does not depend on the current directory."""
+    override = os.environ.get("OFFLINE_RAG_DB")
+    if override:
+        return Path(override).expanduser()
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    return base / "offline-rag" / "index.sqlite3"
+
+
+def resolve_db(explicit: str | None) -> str:
+    """--db wins, then $OFFLINE_RAG_DB, then the fixed folder. A pre-0.1.5 index in the current
+    folder is still used (with a hint) until a fixed-location index exists."""
+    if explicit:
+        return explicit
+    fixed = default_db_path()
+    if not os.environ.get("OFFLINE_RAG_DB") and not fixed.exists() and LEGACY_DB.exists():
+        print(
+            f"Using the index in this folder ({LEGACY_DB}). New default location: {fixed}. "
+            f"Move the file there, or pass --db, to use it from any folder.",
+            file=sys.stderr,
+        )
+        return str(LEGACY_DB)
+    return str(fixed)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="offline-rag", description="Search private documents entirely on your machine."
     )
-    parser.add_argument("--db", default=".offline-rag/index.sqlite3", help="Local SQLite index path")
+    parser.add_argument(
+        "--db", default=None,
+        help="Local SQLite index path (default: $OFFLINE_RAG_DB, or a fixed per-user folder; see README)",
+    )
     parser.add_argument(
         "--json", action="store_true", help="Print machine-readable JSON on stdout (errors stay on stderr)"
     )
@@ -112,6 +149,7 @@ def _retrieve(args) -> list[dict]:
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    args.db = resolve_db(args.db)
     try:
         if args.command == "ingest":
             result = ingest(args.folder, args.db)
