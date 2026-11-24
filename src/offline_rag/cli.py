@@ -81,7 +81,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         if args.command == "ingest":
             result = ingest(args.folder, args.db)
-            skipped = [{"path": str(p), "error": str(e)} for p, e in result.skipped]
+            skipped = [{"path": str(p), "error": message} for p, message in result.skipped]
             if args.json:
                 _dump({
                     "files": result.files, "passages": result.passages,

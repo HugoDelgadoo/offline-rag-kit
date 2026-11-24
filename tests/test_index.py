@@ -137,6 +137,13 @@ class IndexTests(unittest.TestCase):
         self.assertIn("**needle**", hit["snippet"])
         self.assertLess(len(hit["snippet"]), len(hit["body"]))
 
+    def test_broken_pdf_is_not_left_open_after_ingest(self):
+        broken = self.docs / "broken.pdf"
+        broken.write_bytes(b"not a real pdf")
+        result = ingest(self.docs, self.db)
+        self.assertEqual(len(result.skipped), 1)
+        broken.unlink()  # raises PermissionError on Windows if the file is still held open
+
     def test_unchanged_files_are_not_reparsed(self):
         (self.docs / "a.md").write_text("stable text", encoding="utf-8")
         ingest(self.docs, self.db)

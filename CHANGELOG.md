@@ -12,6 +12,9 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 - Evaluation set extended to 27 questions in four languages (hard paraphrases, multilingual and cross-lingual).
 - Design notes in `docs/DESIGN-hybrid-retrieval.md`.
 
+### Fixed
+- A corrupt PDF stayed open after `ingest` reported it, so Windows refused to delete or move it. `IngestResult.skipped` now holds error messages instead of exception objects.
+
 ### Changed
 - CI runs the tests on Ubuntu, Windows and macOS, plus a lint (ruff) and coverage job (minimum 80%); Dependabot proposes updates to GitHub Actions and pip dependencies weekly.
 - `docs/ARCHITECTURE.md` rewritten to match the current code.

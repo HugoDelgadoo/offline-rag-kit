@@ -134,7 +134,7 @@ class IngestResult:
     files: int = 0
     passages: int = 0
     unchanged: int = 0
-    skipped: list[tuple[Path, Exception]] = field(default_factory=list)
+    skipped: list[tuple[Path, str]] = field(default_factory=list)
 
 
 def _sha256(path: Path) -> str:
@@ -192,7 +192,9 @@ def ingest(folder: str | Path, database: str | Path) -> IngestResult:
                     continue
                 entries = list(extract_passages(path))
             except Exception as exc:  # parsers raise many different error types
-                result.skipped.append((path, exc))
+                # Keep only the message: holding the exception would keep its traceback (and the
+                # half-opened PDF it references) alive, which locks the file on Windows.
+                result.skipped.append((path, str(exc)))
                 continue
             with connection:
                 _delete_passages(connection, root_key, relative)
