@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-24
+
 ### Added
 - `offline-rag serve [--port 8765] [--open]`: a local, read-only web interface (search passages with highlighted terms, or list files). It binds to `127.0.0.1` only, refuses requests with a foreign `Host` header, accepts only GET, sets a strict Content-Security-Policy, renders document text without HTML injection, and uses only the standard library. For PDF results, "Show page" renders the page as an image with the passage highlighted (`/preview?id=N`). The preview is found through the index (the browser never sends a path), only for files inside the indexed folder, and the PDF is opened read-only.
 - Windows installer: `scripts/install-windows.ps1` installs the program in a private virtual environment for the current user (no administrator rights), adds the `offline-rag` command to the user PATH and creates Start Menu entries ("Offline RAG" opens the web interface, "Offline RAG - index a folder" asks for a folder and indexes it). `scripts/uninstall-windows.ps1` removes it and keeps your documents and index. CI installs, runs and uninstalls it on Windows.
@@ -93,6 +95,7 @@ First public alpha: a retrieval-first prototype for private, local document sear
 - Lexical search only; semantic/vector retrieval is planned (see [ROADMAP](ROADMAP.md)).
 - Single-user prototype, not a hardened multi-user service.
 
+[0.1.5]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.5
 [0.1.4]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.4
 [0.1.3]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.3
 [0.1.2]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.2
