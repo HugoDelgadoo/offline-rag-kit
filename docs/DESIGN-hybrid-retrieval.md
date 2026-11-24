@@ -1,6 +1,6 @@
 # Design proposal: hybrid retrieval (issue #4)
 
-Status: **proposal, nothing implemented.** Feedback welcome in the issue before any code is written.
+Status: **proposal, nothing implemented.** Maintainer decisions are recorded at the end; they supersede the recommendations above where they differ.
 
 ## Goal
 
@@ -98,9 +98,43 @@ Acceptance criteria:
 3. Vector search and RRF behind `--mode`, with tests that use a fake embedder (no Ollama needed in CI).
 4. Documentation, CHANGELOG, evaluation numbers.
 
-## Open questions
+## Maintainer decisions (2026-11-24) and revised plan
 
-- Is Ollama as the first and only backend acceptable, or is a dependency-free option (pure ONNX) a must?
-- Which default model, given content in several languages?
-- Is a maximum index size a concern for typical users (for example laptops with a few thousand PDFs)?
-- Should `ingest` ever embed automatically, or must it always be an explicit step?
+1. **A dependency-free option is required.** No new Python packages and no model download for the default experience.
+2. **Documents can be in any language.**
+3. **Embedding is always an explicit step** (`offline-rag embed`); `ingest` never embeds on its own.
+
+### What "dependency-free" can and cannot deliver
+
+A model that understands meaning ("buddy" ~ "mentor", "work from home" ~ "teletrabajo") needs trained weights, and weights need a runtime and a download. So there are two different goals:
+
+- **Dependency-free, language-agnostic fuzzy matching** (character n-grams): finds word variants, typos, shared roots across languages ("vacation" ~ "vacaciones", "Flug" ~ "Flüge"). It does **not** understand synonyms or paraphrases.
+- **Real semantic search**: requires a model. Keep it as an optional backend (Ollama first), behind the same interface, for people who want it.
+
+### Prototype evidence (not production code)
+
+A throwaway stdlib-only prototype (character 3-5-grams, TF-IDF, cosine, fused with BM25 by RRF) was run on the extended evaluation set (27 questions; see `docs/EVALUATION.md`):
+
+| Method | R@1 overall | MRR overall | R@1 hard-paraphrase | R@1 cross-lingual |
+| --- | --- | --- | --- | --- |
+| BM25 (current) | 0.70 | 0.76 | 0.29 | 0.00 |
+| char n-grams alone | 0.63 | 0.70 | 0.29 | 0.00 |
+| BM25 + n-grams (RRF) | 0.74 | 0.77 | 0.43 | 0.00 |
+
+Reading it honestly: with 27 questions, one question is about 0.04, so these differences are **within noise**. What the prototype does show is that character n-grams alone do not solve paraphrases or cross-lingual questions, and that the fused result is not worse than BM25. It is not evidence that this approach is "semantic".
+
+### Revised options for the built-in backend
+
+1. **SQLite FTS5 `trigram` tokenizer** as a second index (to be checked: it needs SQLite 3.34+, which recent Python builds ship). Fully built in, no vectors to store, no embed step; fuse with the word index by RRF. Likely the smallest change, but it is lexical fuzzy matching, not embeddings, so it would not use the explicit `embed` step.
+2. **Hashed character n-gram vectors** stored by an explicit `embed` step. Sparse and larger than they look; only worth it if option 1 proves insufficient.
+3. **Model-based embeddings** (Ollama first) for real semantic matching, explicit `embed --backend ollama --model ...`, optional.
+
+### Revised plan
+
+1. Harder, multilingual evaluation set (done in the same change as this update).
+2. Prototype option 1 inside the repo on a branch and measure it on the evaluation set; decide whether it is worth shipping.
+3. Embedding interface + Ollama backend + `embeddings` table + `embed` command, if real semantic search is still wanted.
+4. Vector search + RRF behind `--mode`, tested with a fake embedder.
+5. Documentation and evaluation numbers.
+
+The evaluation set is still small and synthetic. Any result on it should be treated as a smoke test, not a benchmark; larger public datasets are welcome.

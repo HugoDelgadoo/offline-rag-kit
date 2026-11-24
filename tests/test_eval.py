@@ -17,8 +17,11 @@ class EvalTests(unittest.TestCase):
             text = (corpus / item["path"]).read_text(encoding="utf-8").lower()
             self.assertIn(item["contains"].lower(), text, item["q"])
         report = evaluate(corpus, questions)
-        self.assertGreaterEqual(report["overall"]["recall@5"], 0.9)
-        self.assertGreaterEqual(report["by_kind"]["lexical"]["mrr"], 0.9)
+        # Word-overlap questions must keep working; paraphrase / cross-lingual kinds are
+        # tracked in docs/EVALUATION.md but are expected to be weak for lexical search.
+        for kind in ("lexical", "multilingual"):
+            self.assertGreaterEqual(report["by_kind"][kind]["mrr"], 0.9, kind)
+        self.assertGreaterEqual(report["overall"]["recall@5"], 0.8)
 
 
 if __name__ == "__main__":
