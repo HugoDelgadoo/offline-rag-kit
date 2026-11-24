@@ -5,6 +5,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/offline-rag-kit)](https://pypi.org/project/offline-rag-kit/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/LICENSE)
 
+**English** | [Español](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/README.es.md)
+
 **Privacy-first local document search with PDF citations and optional local AI answers.**
 
 > **Status: v0.1 alpha — a working retrieval-first prototype, not yet a complete multimodal RAG system.**
