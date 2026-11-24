@@ -55,11 +55,28 @@ El comando `ask` usa **solo** un servidor Ollama local. No puede garantizar que 
 
 ```text
 offline-rag [--db RUTA] [--json] ingest CARPETA
-offline-rag [--db RUTA] [--json] search "TÉRMINOS" [--limit 5] [--mode lexical|vector|hybrid]
+offline-rag [--db RUTA] [--json] search "TÉRMINOS" [--limit 5] [--mode lexical|vector|hybrid] [--files]
 offline-rag [--db RUTA] [--json] embed [--model bge-m3] [--rebuild] [--ollama-host URL] [--allow-remote]
 offline-rag [--db RUTA] [--json] ask "PREGUNTA" [--limit 5] [--model llama3.2]
                                      [--ollama-host URL] [--allow-remote]
 ```
+
+### ¿Qué archivos contienen una palabra?
+
+Por defecto `search` muestra los **pasajes** que mejor encajan (un mismo archivo puede salir varias veces). Para obtener una lista de **archivos**, añade `--files`: cada archivo sale una sola vez, con su ruta completa, cuántos pasajes coinciden y, en los PDF, las páginas.
+
+```powershell
+offline-rag search "política" --files
+```
+
+```text
+3 files contain 'política':
+  C:\Users\TuUsuario\Documentos\notas\reunion.md  (2 matching passages)
+  C:\Users\TuUsuario\Documentos\manual.md  (1 matching passage)
+  C:\Users\TuUsuario\Documentos\contrato.pdf  (2 matching passages; pages 1, 3)
+```
+
+Se listan los archivos que contienen **todas** las palabras; si no hay ninguno, se listan los que contienen al menos una y la salida lo indica. `--limit` (por defecto 20, hasta 100) limita la lista, y la primera línea siempre muestra el total. `--files` solo funciona en el modo léxico por defecto. (Los mensajes de la herramienta están en inglés.)
 
 Volver a ejecutar `ingest` es incremental: los archivos sin cambios (según el hash de su contenido) no se vuelven a procesar.
 

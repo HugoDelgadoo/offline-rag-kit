@@ -239,6 +239,21 @@ def _remove_stale(connection: sqlite3.Connection, root_key: str, present: set[st
         connection.executemany("DELETE FROM files WHERE root = ? AND path = ?", stale)
 
 
+def _match_expressions(query: str) -> list[tuple[str, str]]:
+    """FTS5 expressions for a query: ("all", every term) first, then ("any", some term).
+
+    Quoting every user token avoids injecting FTS5 operators or syntax.
+    """
+    tokens = list(dict.fromkeys(re.findall(r"\w+", query, flags=re.UNICODE)))
+    if not tokens:
+        return []
+    quoted = [f'"{token}"' for token in tokens]
+    expressions = [("all", " AND ".join(quoted))]
+    if len(quoted) > 1:
+        expressions.append(("any", " OR ".join(quoted)))
+    return expressions
+
+
 def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
     """Rank passages with BM25, preferring passages that contain every term.
 
@@ -248,14 +263,9 @@ def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
     """
     if limit < 1 or limit > 100:
         raise ValueError("limit must be between 1 and 100")
-    tokens = list(dict.fromkeys(re.findall(r"\w+", query, flags=re.UNICODE)))
-    if not tokens:
+    modes = [expression for _, expression in _match_expressions(query)]
+    if not modes:
         return []
-    # Quoting every user token avoids injecting FTS5 operators or syntax.
-    quoted = [f'"{token}"' for token in tokens]
-    modes = [" AND ".join(quoted)]
-    if len(quoted) > 1:
-        modes.append(" OR ".join(quoted))
     results: list[dict] = []
     seen: set[int] = set()
     with closing(open_index(database)) as connection:
@@ -278,6 +288,51 @@ def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
             if len(results) >= limit:
                 break
     return results
+
+
+def search_files(query: str, database: str | Path, limit: int = 20) -> dict:
+    """List the files that contain the query, each once, with how many passages match.
+
+    Files containing every term are listed; if there are none and the query has several
+    terms, files containing at least one term are listed instead (``match`` is then "any").
+    ``total`` counts all matching files, ``files`` holds the best ``limit`` of them.
+    """
+    if limit < 1 or limit > 100:
+        raise ValueError("limit must be between 1 and 100")
+    expressions = _match_expressions(query)
+    kind, rows = "all", []
+    with closing(open_index(database)) as connection:
+        for kind, expression in expressions:  # noqa: B007 - the last kind is reported if nothing matches
+            rows = connection.execute(
+                "SELECT root, path, page, bm25(passages) AS score FROM passages WHERE passages MATCH ?",
+                (expression,),
+            ).fetchall()
+            if rows:
+                break
+    grouped: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        entry = grouped.setdefault(
+            (row["root"], row["path"]),
+            {"root": row["root"], "path": row["path"], "matches": 0, "pages": set(), "score": row["score"]},
+        )
+        entry["matches"] += 1
+        entry["score"] = min(entry["score"], row["score"])
+        if row["page"]:
+            entry["pages"].add(row["page"])
+    files = sorted(grouped.values(), key=lambda e: (e["score"], e["root"], e["path"]))
+    return {
+        "match": kind,
+        "total": len(files),
+        "files": [
+            {
+                "path": str(Path(e["root"]) / e["path"]),
+                "relative_path": e["path"],
+                "matches": e["matches"],
+                "pages": sorted(e["pages"]),
+            }
+            for e in files[:limit]
+        ],
+    }
 
 
 def citation(result: dict) -> str:

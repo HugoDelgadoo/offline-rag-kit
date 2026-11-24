@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 
 ## [Unreleased]
 
+### Added
+- `search --files` lists each file that contains the words once, with its full path, the number of matching passages, the PDF pages and the total number of files (also in `--json`). Files containing every word come first; if none do, files containing any word are listed.
+
 ### Changed
 - The PyPI workflow is a dry run when started manually (tick "publish" to upload), skips files already on PyPI, and CI actions are updated (`checkout` 7, `setup-python` 7, `upload-artifact` 7, `download-artifact` 8).
 

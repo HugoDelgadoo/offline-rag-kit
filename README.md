@@ -53,11 +53,28 @@ The `ask` command uses a **local** Ollama server only. It cannot guarantee the m
 
 ```text
 offline-rag [--db PATH] [--json] ingest FOLDER
-offline-rag [--db PATH] [--json] search "TERMS" [--limit 5] [--mode lexical|vector|hybrid]
+offline-rag [--db PATH] [--json] search "TERMS" [--limit 5] [--mode lexical|vector|hybrid] [--files]
 offline-rag [--db PATH] [--json] embed [--model bge-m3] [--rebuild] [--ollama-host URL] [--allow-remote]
 offline-rag [--db PATH] [--json] ask "QUESTION" [--limit 5] [--model llama3.2]
                                      [--ollama-host URL] [--allow-remote]
 ```
+
+### Which files contain a word?
+
+By default `search` prints the best matching **passages** (the same file can appear several times). To get a list of **files** instead, add `--files`: each file appears once, with its full path, how many passages match and, for PDFs, the pages.
+
+```powershell
+offline-rag search "policy" --files
+```
+
+```text
+3 files contain 'policy':
+  C:\Users\You\Documents\notes\meeting.md  (2 matching passages)
+  C:\Users\You\Documents\handbook.md  (1 matching passage)
+  C:\Users\You\Documents\contract.pdf  (2 matching passages; pages 1, 3)
+```
+
+Files containing **every** word are listed; if there are none, files containing at least one word are listed and the output says so. `--limit` (default 20, up to 100) caps the list, while the first line always shows the total. `--files` works only in the default lexical mode.
 
 Re-running `ingest` is incremental: unchanged files (by content hash) are not re-parsed.
 
