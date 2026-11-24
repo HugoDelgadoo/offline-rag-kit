@@ -60,11 +60,11 @@ jobs:
       - name: The installed program works
         shell: powershell
         run: |
-          $exe = "$env:RUNNER_TEMP\rag\app\Scripts\offline-rag.exe"
+          $py = "$env:RUNNER_TEMP\rag\app\Scripts\python.exe"
           $db = "$env:RUNNER_TEMP\rag\index.sqlite3"
-          & $exe --db $db ingest demo
+          & $py -m offline_rag.cli --db $db ingest demo
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          & $exe --db $db search "the" --files
+          & $py -m offline_rag.cli --db $db search "the" --files
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Uninstall
         shell: powershell

@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 
 ## [Unreleased]
 
+### Fixed
+- The Windows installer starts the program as `python -m offline_rag.cli` from its private environment instead of the `offline-rag.exe` that pip generates, because that unsigned launcher is blocked on PCs with Windows App Control / Smart App Control ("a policy blocked this file"). The `offline-rag` command, the Start Menu entries and the folder picker all use it. (The installer is not part of the PyPI package, so this needs no new release.)
+
 ## [0.1.5] - 2026-11-24
 
 ### Added
