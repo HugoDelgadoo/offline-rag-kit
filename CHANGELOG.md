@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
+## [Unreleased]
+
+### Changed
+- The PyPI workflow is a dry run when started manually (tick "publish" to upload), skips files already on PyPI, and CI actions are updated (`checkout` 7, `setup-python` 7).
+
 ## [0.1.3] - 2026-11-24
 
 ### Added

@@ -1,19 +1,28 @@
 name: Publish to PyPI
 
-# Runs when a GitHub release is published, or manually (Actions > Run workflow, choose
-# main) to publish an existing version. Uses PyPI "trusted publishing" (OIDC),
-# so no API token is stored in the repository.
+# Builds the package and publishes it to PyPI with "trusted publishing" (OIDC), so no API
+# token is stored in the repository.
+#
+#  - Publishing a GitHub release publishes the package.
+#  - Run manually (Actions > Run workflow), the workflow is a DRY RUN by default: it builds,
+#    validates and downloads the package but does not upload it. Tick "publish" to upload.
+#  - Files already on PyPI are skipped, so re-running or releasing an existing version is harmless.
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload to PyPI (leave unticked for a dry run)"
+        type: boolean
+        default: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: python -m pip install --upgrade build twine
@@ -37,4 +46,12 @@ jobs:
         with:
           name: dist
           path: dist/
+      - name: Show what would be uploaded
+        run: ls -l dist/
+      - name: Dry run notice
+        if: github.event_name != 'release' && !inputs.publish
+        run: echo "Dry run - nothing was uploaded to PyPI. Run again with 'publish' ticked to upload."
       - uses: pypa/gh-action-pypi-publish@release/v1
+        if: github.event_name == 'release' || inputs.publish
+        with:
+          skip-existing: true
