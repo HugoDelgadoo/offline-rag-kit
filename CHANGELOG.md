@@ -4,12 +4,13 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
-## [Unreleased]
+## [0.1.4] - 2026-11-24
 
 ### Added
 - `search --files` lists each file that contains the words once, with its full path, the number of matching passages, the PDF pages and the total number of files (also in `--json`). Files containing every word come first; if none do, files containing any word are listed.
 
 ### Changed
+- README (English and Spanish): how to install once with `pipx`, and where the default index is stored (the folder where the command runs) and how to use `--db` for a fixed index.
 - The PyPI workflow is a dry run when started manually (tick "publish" to upload), skips files already on PyPI, and CI actions are updated (`checkout` 7, `setup-python` 7, `upload-artifact` 7, `download-artifact` 8).
 
 ## [0.1.3] - 2026-11-24
@@ -83,6 +84,7 @@ First public alpha: a retrieval-first prototype for private, local document sear
 - Lexical search only; semantic/vector retrieval is planned (see [ROADMAP](ROADMAP.md)).
 - Single-user prototype, not a hardened multi-user service.
 
+[0.1.4]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.4
 [0.1.3]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.3
 [0.1.2]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.2
 [0.1.1]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.1
