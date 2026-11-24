@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
+## [Unreleased]
+
+### Added
+- PDF tables with ruling lines are indexed as a single passage ("Item | Years; Invoices | 10; ...") with the table's bounding box, so a row stays connected to its header; text inside a table is no longer indexed twice.
+
+### Changed
+- Files indexed by an older extractor are re-extracted once on the next `ingest`, even if their content did not change.
+
 ## [0.1.1] - 2026-11-24
 
 ### Changed

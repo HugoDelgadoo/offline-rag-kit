@@ -14,6 +14,10 @@ from typing import Callable, Iterator
 import pymupdf
 
 SUPPORTED_EXTENSIONS = {".md", ".txt", ".pdf"}
+# Bump when extraction changes, so files indexed by older versions are re-extracted
+# even though their content hash is unchanged. Stored as a prefix of the file hash.
+EXTRACTOR_VERSION = 2
+_HASH_PREFIX = f"x{EXTRACTOR_VERSION}:"
 
 
 def open_index(database: str | Path) -> sqlite3.Connection:
@@ -48,17 +52,46 @@ def open_index(database: str | Path) -> sqlite3.Connection:
     return connection
 
 
+def _table_passages(page: "pymupdf.Page") -> list[tuple[pymupdf.Rect, str]]:
+    """Return (bbox, text) for each ruled table on the page; never raises."""
+    try:
+        tables = page.find_tables().tables
+    except Exception:  # table detection is best-effort; plain text extraction still works
+        return []
+    found = []
+    for table in tables:
+        rows = [
+            [" ".join(str(cell or "").split()) for cell in row]
+            for row in table.extract()
+        ]
+        rows = [row for row in rows if any(row)]
+        if len(rows) < 2 or max(len(row) for row in rows) < 2:
+            continue  # a single row or column is not worth treating as a table
+        found.append((pymupdf.Rect(table.bbox), "; ".join(" | ".join(row) for row in rows)))
+    return found
+
+
 def extract_passages(path: Path) -> Iterator[tuple[int, str, str]]:
-    """Yield (page number, bounding box, paragraph text). Page 0 means text file."""
+    """Yield (page number, bounding box, paragraph text). Page 0 means text file.
+
+    Ruled PDF tables are emitted as one passage ("Item | Years; Invoices | 10; ...")
+    so a row stays connected to its header; text blocks inside a table are not repeated.
+    """
     if path.suffix.lower() == ".pdf":
         with pymupdf.open(path) as document:
             for page_number, page in enumerate(document, start=1):
+                tables = _table_passages(page)
+                for rect, text in tables:
+                    yield page_number, ",".join(f"{n:.1f}" for n in rect), text
                 for block in page.get_text("blocks"):
                     if len(block) > 6 and block[6] != 0:
                         continue  # Skip image blocks.
                     body = " ".join(str(block[4]).split())
                     if not body:
                         continue
+                    centre = pymupdf.Point((block[0] + block[2]) / 2, (block[1] + block[3]) / 2)
+                    if any(centre in rect for rect, _ in tables):
+                        continue  # already part of a table passage
                     bbox = ",".join(f"{float(n):.1f}" for n in block[:4])
                     yield page_number, bbox, body
     else:
@@ -115,11 +148,12 @@ def ingest(folder: str | Path, database: str | Path) -> IngestResult:
                     "SELECT size, mtime_ns, sha256 FROM files WHERE root = ? AND path = ?",
                     (root_key, relative),
                 ).fetchone()
-                if known and (known["size"], known["mtime_ns"]) == (stat.st_size, stat.st_mtime_ns):
+                current = bool(known) and known["sha256"].startswith(_HASH_PREFIX)
+                if current and (known["size"], known["mtime_ns"]) == (stat.st_size, stat.st_mtime_ns):
                     digest = known["sha256"]  # same size and mtime: trust it, skip hashing
                 else:
-                    digest = _sha256(path)
-                if known and known["sha256"] == digest:
+                    digest = _HASH_PREFIX + _sha256(path)
+                if current and known["sha256"] == digest:
                     count = connection.execute(
                         "SELECT COUNT(*) FROM passages WHERE root = ? AND path = ?", (root_key, relative)
                     ).fetchone()[0]

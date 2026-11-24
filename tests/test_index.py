@@ -171,6 +171,47 @@ class IndexTests(unittest.TestCase):
         self.assertEqual(len(result.skipped), 1)
         self.assertEqual(len(search("keep", self.db)), 1)
 
+    def _pdf_with_table(self, path):
+        with pymupdf.open() as doc:
+            page = doc.new_page()
+            page.insert_textbox(pymupdf.Rect(72, 72, 300, 120), "Retention periods are reviewed every year.", fontsize=11)
+            for r, row in enumerate([["Item", "Years"], ["Invoices", "10"], ["Tickets", "3"]]):
+                for c, value in enumerate(row):
+                    rect = pymupdf.Rect(72 + c * 100, 230 + r * 24, 172 + c * 100, 254 + r * 24)
+                    page.draw_rect(rect, width=0.8)
+                    page.insert_text((rect.x0 + 4, rect.y1 - 7), value, fontsize=11)
+            doc.save(path)
+
+    def test_pdf_table_is_one_passage_connected_to_its_header(self):
+        self._pdf_with_table(self.docs / "table.pdf")
+        ingest(self.docs, self.db)
+        hit = search("invoices years", self.db)[0]  # row label + header word together
+        self.assertIn("Item | Years", hit["body"])
+        self.assertIn("Invoices | 10", hit["body"])
+        self.assertEqual(hit["page"], 1)
+        self.assertEqual(len(hit["bbox"].split(",")), 4)
+        self.assertEqual(len(search("invoices", self.db)), 1)  # row text not indexed twice
+        self.assertEqual(len(search("retention", self.db)), 1)  # surrounding paragraph kept
+
+    def test_pdf_without_tables_is_unchanged(self):
+        path = self.docs / "plain.pdf"
+        with pymupdf.open() as doc:
+            doc.new_page().insert_text((72, 90), "Just plain text | with a pipe")
+            doc.save(path)
+        ingest(self.docs, self.db)
+        self.assertEqual(len(search("plain", self.db)), 1)
+
+    def test_files_indexed_by_older_extractor_are_reextracted(self):
+        import sqlite3
+
+        (self.docs / "a.md").write_text("old extractor", encoding="utf-8")
+        ingest(self.docs, self.db)
+        with sqlite3.connect(self.db) as connection:  # simulate a row written by v0.1.x (bare hash)
+            connection.execute("UPDATE files SET sha256 = substr(sha256, instr(sha256, ':') + 1)")
+        result = ingest(self.docs, self.db)
+        self.assertEqual((result.files, result.unchanged), (1, 0))
+        self.assertEqual(ingest(self.docs, self.db).unchanged, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -75,7 +75,7 @@ Re-running `ingest` is incremental: unchanged files (by content hash) are not re
 | Web dashboard / user authentication | Planned |
 | Reliable claim-level grounding evaluation | Planned |
 
-The first version **does not** OCR scanned PDFs or interpret PDF tables reliably. Each PDF text block is a retrieval unit, so coordinates describe blocks rather than arbitrary answer spans. Changed files are refreshed on re-ingest and deleted files are removed from the index. This is a single-user developer prototype, not a hardened multi-user service.
+The first version **does not** OCR scanned PDFs. Ruled tables in PDFs are indexed as one passage per table (borderless tables are not detected). Each PDF text block is a retrieval unit, so coordinates describe blocks rather than arbitrary answer spans. Changed files are refreshed on re-ingest and deleted files are removed from the index. This is a single-user developer prototype, not a hardened multi-user service.
 
 ## Evaluation
 
