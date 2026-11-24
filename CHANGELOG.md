@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
+## [0.1.1] - 2026-11-24
+
+### Changed
+- README: CI, PyPI, Python and license badges; links work on the PyPI page; install with `pip install offline-rag-kit`.
+
 ## [0.1.0] - 2026-11-24
 
 First public alpha: a retrieval-first prototype for private, local document search.
@@ -44,4 +49,5 @@ First public alpha: a retrieval-first prototype for private, local document sear
 - Lexical search only; semantic/vector retrieval is planned (see [ROADMAP](ROADMAP.md)).
 - Single-user prototype, not a hardened multi-user service.
 
+[0.1.1]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.1
 [0.1.0]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.0

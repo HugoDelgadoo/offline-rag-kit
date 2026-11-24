@@ -1,5 +1,10 @@
 # Offline RAG Kit
 
+[![CI](https://github.com/HugoDelgadoo/offline-rag-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/HugoDelgadoo/offline-rag-kit/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/offline-rag-kit)](https://pypi.org/project/offline-rag-kit/)
+[![Python](https://img.shields.io/pypi/pyversions/offline-rag-kit)](https://pypi.org/project/offline-rag-kit/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/LICENSE)
+
 **Privacy-first local document search with PDF citations and optional local AI answers.**
 
 > **Status: v0.1 alpha — a working retrieval-first prototype, not yet a complete multimodal RAG system.**
@@ -21,7 +26,7 @@ Requirements: Python 3.10 or newer.
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e .
+python -m pip install offline-rag-kit
 offline-rag ingest .\demo
 offline-rag search "SQLite"
 ```
@@ -78,7 +83,7 @@ The first version **does not** OCR scanned PDFs or interpret PDF tables reliably
 python -m offline_rag.eval
 ```
 
-Measures recall@k and MRR on a small bundled dataset (`eval/`). See [docs/EVALUATION.md](docs/EVALUATION.md) for the current baseline.
+Measures recall@k and MRR on a small bundled dataset (`eval/`). See [docs/EVALUATION.md](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/docs/EVALUATION.md) for the current baseline.
 
 ## Development
 
@@ -87,12 +92,12 @@ python -m pip install -e .
 python -m unittest discover -s tests -v
 ```
 
-See [ROADMAP](ROADMAP.md), [architecture](docs/ARCHITECTURE.md) and [contribution guide](CONTRIBUTING.md). Contributions, reproducible bug reports and small real-world test datasets (without confidential content) are welcome.
+See [ROADMAP](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/ROADMAP.md), [architecture](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/docs/ARCHITECTURE.md) and [contribution guide](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/CONTRIBUTING.md). Contributions, reproducible bug reports and small real-world test datasets (without confidential content) are welcome.
 
 ## Maintainer
 
-Created and maintained by [@HugoDelgadoo](https://github.com/HugoDelgadoo). See the [changelog](CHANGELOG.md) for release notes.
+Created and maintained by [@HugoDelgadoo](https://github.com/HugoDelgadoo). See the [changelog](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/CHANGELOG.md) for release notes.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/LICENSE).
