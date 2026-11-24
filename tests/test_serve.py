@@ -69,6 +69,22 @@ class ServeTests(unittest.TestCase):
         _, body = self.request("GET", "/api/files?q=retention")
         self.assertEqual(json.loads(body)["total"], 2)
 
+    def test_info_says_where_it_searches(self):
+        response, body = self.request("GET", "/api/info")
+        data = json.loads(body)
+        self.assertEqual(response.status, 200)
+        self.assertEqual((data["files"], len(data["folders"])), (2, 1))
+        self.assertTrue(data["folders"][0]["path"].endswith("docs"))
+        self.assertEqual(data["folders"][0]["files"], 2)
+        self.assertGreaterEqual(data["passages"], 2)
+
+    def test_page_offers_english_and_spanish(self):
+        _, body = self.request("GET", "/")
+        page = body.decode("utf-8")
+        for text in ("Search your local index", "Busca en tu índice local", 'data-lang="en"', 'data-lang="es"',
+                     "navigator.languages", "Solo se busca en estas carpetas"):
+            self.assertIn(text, page)
+
     def test_markup_in_documents_is_returned_as_plain_text(self):
         response, body = self.request("GET", "/api/search?q=alert")
         self.assertTrue(response.getheader("Content-Type").startswith("application/json"))
@@ -93,6 +109,7 @@ class ServeTests(unittest.TestCase):
     def test_index_is_not_modified(self):
         self.request("GET", "/api/search?q=retention")
         self.request("GET", "/api/files?q=retention")
+        self.request("GET", "/api/info")
         self.assertEqual(self.db.read_bytes(), self.before)
 
 
