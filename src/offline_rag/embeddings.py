@@ -12,9 +12,9 @@ import json
 import math
 import operator
 import struct
+from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
-from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -123,7 +123,7 @@ def embed_index(
             with connection:
                 connection.executemany(
                     "INSERT OR REPLACE INTO embeddings (passage_rowid, model, dim, vector) VALUES (?, ?, ?, ?)",
-                    ((row["id"], model, len(v), _encode(v)) for row, v in zip(batch, vectors)),
+                    ((row["id"], model, len(v), _encode(v)) for row, v in zip(batch, vectors, strict=True)),
                 )
     return len(todo)
 

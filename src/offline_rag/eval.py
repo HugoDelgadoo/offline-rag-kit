@@ -87,7 +87,8 @@ def main(argv: list[str] | None = None) -> None:
         return
     print(f"{'subset':<12}{'n':>4}" + "".join(f"{'R@' + str(k):>8}" for k in KS) + f"{'MRR':>8}")
     for name, st in [("overall", report["overall"]), *report["by_kind"].items()]:
-        print(f"{name:<12}{st['questions']:>4}" + "".join(f"{st[f'recall@{k}']:>8.3f}" for k in KS) + f"{st['mrr']:>8.3f}")
+        recalls = "".join(f"{st[f'recall@{k}']:>8.3f}" for k in KS)
+        print(f"{name:<12}{st['questions']:>4}{recalls}{st['mrr']:>8.3f}")
     missed = [r["q"] for r in report["rows"] if not r["rank"]]
     if missed:
         print("\nNot found in top 5:")

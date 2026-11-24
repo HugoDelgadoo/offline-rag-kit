@@ -122,7 +122,9 @@ class IndexTests(unittest.TestCase):
         import sqlite3
 
         with sqlite3.connect(self.db) as old:
-            old.execute("CREATE VIRTUAL TABLE passages USING fts5(path UNINDEXED, page UNINDEXED, bbox UNINDEXED, body)")
+            old.execute(
+                "CREATE VIRTUAL TABLE passages USING fts5(path UNINDEXED, page UNINDEXED, bbox UNINDEXED, body)"
+            )
         old.close()
         with self.assertRaisesRegex(ValueError, "older version"):
             search("anything", self.db)
@@ -174,7 +176,9 @@ class IndexTests(unittest.TestCase):
     def _pdf_with_table(self, path):
         with pymupdf.open() as doc:
             page = doc.new_page()
-            page.insert_textbox(pymupdf.Rect(72, 72, 300, 120), "Retention periods are reviewed every year.", fontsize=11)
+            page.insert_textbox(
+                pymupdf.Rect(72, 72, 300, 120), "Retention periods are reviewed every year.", fontsize=11
+            )
             for r, row in enumerate([["Item", "Years"], ["Invoices", "10"], ["Tickets", "3"]]):
                 for c, value in enumerate(row):
                     rect = pymupdf.Rect(72 + c * 100, 230 + r * 24, 172 + c * 100, 254 + r * 24)

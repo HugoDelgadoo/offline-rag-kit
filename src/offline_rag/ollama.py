@@ -3,12 +3,11 @@
 import ipaddress
 import json
 import os
-from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .index import citation
-
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 

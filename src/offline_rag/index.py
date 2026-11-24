@@ -6,10 +6,10 @@ import hashlib
 import os
 import re
 import sqlite3
+from collections.abc import Iterator
 from contextlib import closing
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterator
 
 import pymupdf
 
@@ -76,7 +76,7 @@ def join_hyphenated(text: str) -> str:
     return _HYPHEN_BREAK.sub(repair, text)
 
 
-def _table_passages(page: "pymupdf.Page") -> list[tuple[pymupdf.Rect, str]]:
+def _table_passages(page: pymupdf.Page) -> list[tuple[pymupdf.Rect, str]]:
     """Return (bbox, text) for each ruled table on the page; never raises."""
     try:
         tables = page.find_tables().tables

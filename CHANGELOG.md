@@ -13,6 +13,8 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 - Design notes in `docs/DESIGN-hybrid-retrieval.md`.
 
 ### Changed
+- CI runs the tests on Ubuntu, Windows and macOS, plus a lint (ruff) and coverage job (minimum 80%); Dependabot proposes updates to GitHub Actions and pip dependencies weekly.
+- `docs/ARCHITECTURE.md` rewritten to match the current code.
 - Search hits carry an internal `id`; re-indexing or deleting a file also removes its vectors.
 
 ## [0.1.2] - 2026-11-24

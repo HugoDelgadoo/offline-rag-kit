@@ -122,7 +122,8 @@ class OllamaProtocolTests(unittest.TestCase):
         return io.BytesIO(json.dumps(payload).encode())
 
     def test_posts_to_api_embed_and_returns_vectors(self):
-        with mock.patch.object(embeddings, "urlopen", return_value=self.response({"embeddings": [[1, 0], [0, 1]]})) as urlopen:
+        reply = self.response({"embeddings": [[1, 0], [0, 1]]})
+        with mock.patch.object(embeddings, "urlopen", return_value=reply) as urlopen:
             vectors = ollama_embedder("bge-m3", host="localhost:5555")(["a", "b"])
         request = urlopen.call_args.args[0]
         self.assertEqual(request.full_url, "http://localhost:5555/api/embed")
