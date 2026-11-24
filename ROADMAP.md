@@ -17,8 +17,8 @@ This roadmap is a plan, not a claim that future capabilities already exist.
 - [x] Error handling for encrypted or broken PDFs
 
 ## v0.3 — semantic and hybrid retrieval
-- [ ] Local embedding model and Qdrant option
-- [ ] Fusion of lexical + vector hits (RRF)
+- [x] Local embedding model (Ollama) with an explicit `embed` step; a Qdrant option is not planned for now
+- [x] Fusion of lexical + vector hits (RRF)
 - [ ] Local reranking
 - [ ] Question-answer faithfulness evaluation with versioned datasets
 

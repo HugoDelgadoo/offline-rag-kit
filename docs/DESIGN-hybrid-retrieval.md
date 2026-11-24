@@ -1,6 +1,6 @@
 # Design proposal: hybrid retrieval (issue #4)
 
-Status: **proposal, nothing implemented.** Maintainer decisions are recorded at the end; they supersede the recommendations above where they differ.
+Status: **implemented in the Unreleased version** (see the outcome section at the end). Maintainer decisions are recorded at the end; they supersede the recommendations above where they differ.
 
 ## Goal
 
@@ -138,3 +138,10 @@ Reading it honestly: with 27 questions, one question is about 0.04, so these dif
 5. Documentation and evaluation numbers.
 
 The evaluation set is still small and synthetic. Any result on it should be treated as a smoke test, not a benchmark; larger public datasets are welcome.
+
+## Outcome
+
+- **Built-in fuzzy option: measured, not shipped.** The FTS5 `trigram` index fused with BM25 (all character trigrams of the query, ORed) scored R@1 0.70 / MRR 0.77 against BM25's 0.70 / 0.76 on the 27-question set, with no gain on hard paraphrases (0.29) or cross-lingual questions (0.00): no meaningful difference, so it adds complexity for nothing.
+- **Semantic search with Ollama: implemented.** `offline-rag embed` (explicit), `--mode vector|hybrid`, Ollama's `/api/embed`, vectors as float32 BLOBs in SQLite, brute-force cosine in pure Python, RRF with k = 60. No new dependencies. Remote hosts need `--allow-remote`.
+- **Tested** with a fake embedder and a fake local Ollama HTTP server, which check the protocol and the plumbing. **Not tested with a real model**, so the quality gain is unmeasured; run `python -m offline_rag.eval --mode hybrid --model <model>` and compare with the baseline in `docs/EVALUATION.md`.
+- **Not done:** OpenAI-compatible backends, query/document prefixes needed by some models, quantized or indexed vector search, and automatic embedding during `ingest` (declined: embedding stays an explicit step).

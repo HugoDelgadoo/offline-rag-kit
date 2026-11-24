@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
+## [Unreleased]
+
+### Added
+- Optional semantic search with local Ollama embeddings: `offline-rag embed` (explicit step), `search`/`ask --mode vector|hybrid` (BM25 + vectors fused with Reciprocal Rank Fusion). Vectors are stored in the same SQLite file; only the standard library is used. `ingest` never calls Ollama and the default mode stays `lexical`.
+- `python -m offline_rag.eval --mode hybrid` to measure semantic retrieval on the bundled dataset.
+- Evaluation set extended to 27 questions in four languages (hard paraphrases, multilingual and cross-lingual).
+- Design notes in `docs/DESIGN-hybrid-retrieval.md`.
+
+### Changed
+- Search hits carry an internal `id`; re-indexing or deleting a file also removes its vectors.
+
 ## [0.1.2] - 2026-11-24
 
 ### Added

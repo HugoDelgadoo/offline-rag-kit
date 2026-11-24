@@ -14,18 +14,27 @@ import sys
 import tempfile
 from pathlib import Path
 
+from .embeddings import DEFAULT_MODEL, embed_index, hybrid_search, ollama_embedder, vector_search
 from .index import ingest, search
 
 KS = (1, 3, 5)
 
 
-def evaluate(corpus: Path, questions: list[dict]) -> dict:
+def evaluate(corpus: Path, questions: list[dict], mode: str = "lexical", embedder=None, model: str = "") -> dict:
+    """Run the questions. ``mode`` is lexical, vector or hybrid; the last two need ``embedder``."""
     with tempfile.TemporaryDirectory() as tmp:
         database = Path(tmp) / "eval.sqlite3"
         ingest(corpus, database)
+        if mode != "lexical":
+            embed_index(database, embedder, model)
         rows = []
         for item in questions:
-            hits = search(item["q"], database, limit=max(KS))
+            if mode == "lexical":
+                hits = search(item["q"], database, limit=max(KS))
+            elif mode == "vector":
+                hits = vector_search(item["q"], database, embedder, limit=max(KS))
+            else:
+                hits = hybrid_search(item["q"], database, embedder, limit=max(KS))
             rank = next(
                 (
                     i
@@ -56,11 +65,21 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--corpus", default="eval/corpus", type=Path)
     parser.add_argument("--questions", default="eval/questions.json", type=Path)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--mode", choices=("lexical", "vector", "hybrid"), default="lexical",
+        help="vector/hybrid embed the corpus with local Ollama first (needs 'ollama serve' and the model)",
+    )
+    parser.add_argument("--model", default=DEFAULT_MODEL, help="Ollama embedding model for vector/hybrid")
+    parser.add_argument("--ollama-host")
+    parser.add_argument("--allow-remote", action="store_true")
     args = parser.parse_args(argv)
     try:
         questions = json.loads(args.questions.read_text(encoding="utf-8"))["questions"]
-        report = evaluate(args.corpus, questions)
-    except (OSError, ValueError, KeyError) as exc:
+        embedder = None
+        if args.mode != "lexical":
+            embedder = ollama_embedder(args.model, args.ollama_host, args.allow_remote)
+        report = evaluate(args.corpus, questions, args.mode, embedder, args.model)
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
     if args.json:

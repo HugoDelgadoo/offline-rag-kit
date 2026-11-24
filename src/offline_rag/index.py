@@ -43,6 +43,12 @@ def open_index(database: str | Path) -> sqlite3.Connection:
         )"""
     )
     connection.execute(
+        """CREATE TABLE IF NOT EXISTS embeddings (
+            passage_rowid INTEGER PRIMARY KEY,
+            model TEXT NOT NULL, dim INTEGER NOT NULL, vector BLOB NOT NULL
+        )"""
+    )
+    connection.execute(
         """CREATE TABLE IF NOT EXISTS files (
             root TEXT NOT NULL, path TEXT NOT NULL,
             size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, sha256 TEXT NOT NULL,
@@ -189,7 +195,7 @@ def ingest(folder: str | Path, database: str | Path) -> IngestResult:
                 result.skipped.append((path, exc))
                 continue
             with connection:
-                connection.execute("DELETE FROM passages WHERE root = ? AND path = ?", (root_key, relative))
+                _delete_passages(connection, root_key, relative)
                 connection.executemany(
                     "INSERT INTO passages (root, path, page, bbox, body) VALUES (?, ?, ?, ?, ?)",
                     ((root_key, relative, page, bbox, body) for page, bbox, body in entries),
@@ -204,6 +210,16 @@ def ingest(folder: str | Path, database: str | Path) -> IngestResult:
     return result
 
 
+def _delete_passages(connection: sqlite3.Connection, root: str, path: str) -> None:
+    """Delete a file's passages together with their embeddings."""
+    connection.execute(
+        "DELETE FROM embeddings WHERE passage_rowid IN "
+        "(SELECT rowid FROM passages WHERE root = ? AND path = ?)",
+        (root, path),
+    )
+    connection.execute("DELETE FROM passages WHERE root = ? AND path = ?", (root, path))
+
+
 def _remove_stale(connection: sqlite3.Connection, root_key: str, present: set[str]) -> None:
     """Delete data of removed files, and of folders that no longer exist (moved/renamed)."""
     rows = connection.execute(
@@ -216,7 +232,8 @@ def _remove_stale(connection: sqlite3.Connection, root_key: str, present: set[st
         or (row["root"] != root_key and not os.path.isdir(row["root"]))
     ]
     with connection:
-        connection.executemany("DELETE FROM passages WHERE root = ? AND path = ?", stale)
+        for root_value, path_value in stale:
+            _delete_passages(connection, root_value, path_value)
         connection.executemany("DELETE FROM files WHERE root = ? AND path = ?", stale)
 
 
@@ -254,7 +271,7 @@ def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
                 if row["rowid"] not in seen and len(results) < limit:
                     seen.add(row["rowid"])
                     hit = dict(row)
-                    del hit["rowid"]
+                    hit["id"] = hit.pop("rowid")  # passage id, used to fuse rankings
                     results.append(hit)
             if len(results) >= limit:
                 break

@@ -51,7 +51,8 @@ The `ask` command uses a **local** Ollama server only. It cannot guarantee the m
 
 ```text
 offline-rag [--db PATH] [--json] ingest FOLDER
-offline-rag [--db PATH] [--json] search "TERMS" [--limit 5]
+offline-rag [--db PATH] [--json] search "TERMS" [--limit 5] [--mode lexical|vector|hybrid]
+offline-rag [--db PATH] [--json] embed [--model bge-m3] [--rebuild] [--ollama-host URL] [--allow-remote]
 offline-rag [--db PATH] [--json] ask "QUESTION" [--limit 5] [--model llama3.2]
                                      [--ollama-host URL] [--allow-remote]
 ```
@@ -59,6 +60,23 @@ offline-rag [--db PATH] [--json] ask "QUESTION" [--limit 5] [--model llama3.2]
 Re-running `ingest` is incremental: unchanged files (by content hash) are not re-parsed.
 
 `ask` talks to `127.0.0.1:11434` by default. Set `OLLAMA_HOST` or `--ollama-host` to use another port. Non-loopback hosts are refused unless you pass `--allow-remote`, because retrieved passages would then leave your machine.
+
+### Optional semantic search (local Ollama)
+
+Plain `search` is lexical and works fully offline. To also match by meaning (for example "work from home" ~ "teletrabajo"), create embeddings **explicitly** with a local Ollama model, then choose a mode:
+
+```powershell
+ollama pull bge-m3                       # a multilingual embedding model
+offline-rag embed --model bge-m3         # explicit step; only embeds new passages
+offline-rag search "work from home" --mode hybrid   # BM25 + vectors fused (RRF)
+offline-rag search "work from home" --mode vector   # vectors only
+```
+
+- `ingest` never calls Ollama, and the default mode stays `lexical`. Semantic modes need Ollama running when you search, because the question must be embedded too.
+- The index remembers which model made its vectors. Switching models needs `offline-rag embed --model NEW --rebuild`.
+- Same privacy rule as `ask`: only loopback hosts are accepted unless you pass `--allow-remote`.
+- Vectors are compared with a plain scan, which is fine for thousands of passages but slows down on very large collections. Embedding speed depends on your hardware and model.
+- **Not yet measured with a real model.** Use `python -m offline_rag.eval --mode hybrid --model bge-m3` to see what it does on the bundled dataset.
 
 `--json` (placed before the subcommand) prints a single JSON document on stdout, with the full passage text, page, bounding box and score for each hit. Errors and exit codes are unchanged and still go to stderr.
 
@@ -70,7 +88,7 @@ Re-running `ingest` is incremental: unchanged files (by content hash) are not re
 | Lexical ranking with SQLite FTS5 (BM25) | Supported |
 | PDF source pages and block bounding boxes | Supported |
 | Local Ollama text generation | Optional, supported |
-| Semantic / vector retrieval | Planned |
+| Semantic / vector retrieval | Optional, via local Ollama embeddings (not yet benchmarked) |
 | OCR, image understanding, audio transcription | Planned |
 | Web dashboard / user authentication | Planned |
 | Reliable claim-level grounding evaluation | Planned |

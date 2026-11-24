@@ -19,3 +19,13 @@ paraphrase     4   0.750   0.750   1.000   0.812
 ```
 
 BM25 handles questions that share words with the answer, and fails on paraphrases and on questions asked in another language than the document. Those are the cases hybrid retrieval would have to improve (see `docs/DESIGN-hybrid-retrieval.md`).
+
+## Evaluating semantic retrieval
+
+```powershell
+ollama pull bge-m3
+python -m offline_rag.eval --mode hybrid --model bge-m3
+python -m offline_rag.eval --mode vector --model bge-m3
+```
+
+These modes embed the bundled corpus with your local Ollama and print the same table. No results are recorded here yet because they depend on the model and have not been measured on a real model; please share yours in issue #4.
