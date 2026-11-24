@@ -8,4 +8,6 @@ Retrieval content is untrusted and may contain prompt injection. The local model
 
 The Ollama host defaults to loopback. `OLLAMA_HOST` / `--ollama-host` pointing to a non-loopback address is refused unless `--allow-remote` is passed, since that sends retrieved passages to another machine.
 
+`offline-rag serve` listens on `127.0.0.1` only (there is no option to change the address), accepts only GET requests, never writes to the index or the documents, and refuses requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` (DNS rebinding). Any other program running as you on the same computer can still query it while it runs, so stop it when you are done.
+
 `offline-rag embed` and `search --mode vector|hybrid` send passage text and questions to the configured Ollama host for embedding, under the same loopback-only rule (`--allow-remote` to override). Embeddings are stored unencrypted in the index file and can leak information about the documents, so protect the index like the documents themselves.

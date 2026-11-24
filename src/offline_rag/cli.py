@@ -67,6 +67,10 @@ def build_parser() -> argparse.ArgumentParser:
     emb.add_argument("--ollama-host", help="Ollama URL (default: $OLLAMA_HOST or 127.0.0.1:11434)")
     emb.add_argument("--allow-remote", action="store_true", help="Allow a non-loopback Ollama host")
 
+    srv = commands.add_parser("serve", help="Open a local, read-only web interface (127.0.0.1 only)")
+    srv.add_argument("--port", type=int, default=8765, help="Port on 127.0.0.1 (default: 8765, 0 = any free port)")
+    srv.add_argument("--open", action="store_true", help="Open the page in your default browser")
+
     for command in ("search", "ask"):
         sub = commands.add_parser(command, help="Search locally" if command == "search" else "Ask local Ollama")
         sub.add_argument("query", help="Question or search terms")
@@ -147,6 +151,24 @@ def _retrieve(args) -> list[dict]:
     return run(args.query, args.db, embedder, limit)
 
 
+def _serve(args: argparse.Namespace) -> None:
+    from .serve import make_server
+
+    if not 0 <= args.port <= 65535:
+        raise ValueError("--port must be between 0 and 65535")
+    with make_server(args.db, args.port) as server:
+        url = f"http://127.0.0.1:{server.server_address[1]}/"
+        print(f"Serving {args.db} at {url} (read-only, this computer only). Press Ctrl+C to stop.")
+        if args.open:
+            import webbrowser
+
+            webbrowser.open(url)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nStopped.")
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     args.db = resolve_db(args.db)
@@ -166,6 +188,8 @@ def main(argv: list[str] | None = None) -> None:
                     f"Indexed {result.files} files ({result.unchanged} unchanged) and "
                     f"{result.passages} passages in {args.db}"
                 )
+        elif args.command == "serve":
+            _serve(args)
         elif args.command == "embed":
             embedder = ollama_embedder(args.model, args.ollama_host, args.allow_remote)
             count = embed_index(args.db, embedder, args.model, rebuild=args.rebuild)
