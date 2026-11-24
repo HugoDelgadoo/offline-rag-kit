@@ -7,7 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 ## [Unreleased]
 
 ### Changed
-- The PyPI workflow is a dry run when started manually (tick "publish" to upload), skips files already on PyPI, and CI actions are updated (`checkout` 7, `setup-python` 7).
+- The PyPI workflow is a dry run when started manually (tick "publish" to upload), skips files already on PyPI, and CI actions are updated (`checkout` 7, `setup-python` 7, `upload-artifact` 7, `download-artifact` 8).
 
 ## [0.1.3] - 2026-11-24
 
