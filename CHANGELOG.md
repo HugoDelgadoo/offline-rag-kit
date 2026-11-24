@@ -7,7 +7,8 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 ## [Unreleased]
 
 ### Added
-- PDF tables with ruling lines are indexed as a single passage ("Item | Years; Invoices | 10; ...") with the table's bounding box, so a row stays connected to its header; text inside a table is no longer indexed twice.
+- PDF words split by a hyphen at a line end ("docu-\nment") are rejoined so they can be found; a compound split exactly at a line end loses its hyphen.
+- PDF tables detected by PyMuPDF (ruled, and often well-aligned borderless ones) are indexed as a single passage ("Item | Years; Invoices | 10; ...") with the table's bounding box, so a row stays connected to its header; text inside a table is no longer indexed twice.
 
 ### Changed
 - Files indexed by an older extractor are re-extracted once on the next `ingest`, even if their content did not change.

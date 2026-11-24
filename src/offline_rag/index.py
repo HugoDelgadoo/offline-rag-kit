@@ -16,7 +16,7 @@ import pymupdf
 SUPPORTED_EXTENSIONS = {".md", ".txt", ".pdf"}
 # Bump when extraction changes, so files indexed by older versions are re-extracted
 # even though their content hash is unchanged. Stored as a prefix of the file hash.
-EXTRACTOR_VERSION = 2
+EXTRACTOR_VERSION = 3
 _HASH_PREFIX = f"x{EXTRACTOR_VERSION}:"
 
 
@@ -50,6 +50,24 @@ def open_index(database: str | Path) -> sqlite3.Connection:
         )"""
     )
     return connection
+
+
+_HYPHEN_BREAK = re.compile(r"(\w)-[ \t]*\n[ \t]*(\w)")
+
+
+def join_hyphenated(text: str) -> str:
+    """Rejoin words split by a hyphen at the end of a line ("docu-\\nment" -> "document").
+
+    The break is removed when the next line continues in lowercase; if it starts with a
+    capital or digit ("Jean-\\nPaul") the hyphen is kept. A real compound split at a
+    line end ("state-\\nof-the-art") loses its hyphen: an accepted trade-off, because
+    unjoined fragments ("docu- ment") cannot be found by search at all.
+    """
+    def repair(match: re.Match) -> str:
+        before, after = match.group(1), match.group(2)
+        return before + after if after.islower() else f"{before}-{after}"
+
+    return _HYPHEN_BREAK.sub(repair, text)
 
 
 def _table_passages(page: "pymupdf.Page") -> list[tuple[pymupdf.Rect, str]]:
@@ -86,7 +104,7 @@ def extract_passages(path: Path) -> Iterator[tuple[int, str, str]]:
                 for block in page.get_text("blocks"):
                     if len(block) > 6 and block[6] != 0:
                         continue  # Skip image blocks.
-                    body = " ".join(str(block[4]).split())
+                    body = " ".join(join_hyphenated(str(block[4])).split())
                     if not body:
                         continue
                     centre = pymupdf.Point((block[0] + block[2]) / 2, (block[1] + block[3]) / 2)

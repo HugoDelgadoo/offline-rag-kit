@@ -8,7 +8,7 @@ from unittest import mock
 
 import pymupdf
 
-from offline_rag.index import citation, ingest, search
+from offline_rag.index import citation, ingest, join_hyphenated, search
 
 
 class IndexTests(unittest.TestCase):
@@ -206,11 +206,30 @@ class IndexTests(unittest.TestCase):
 
         (self.docs / "a.md").write_text("old extractor", encoding="utf-8")
         ingest(self.docs, self.db)
-        with sqlite3.connect(self.db) as connection:  # simulate a row written by v0.1.x (bare hash)
+        connection = sqlite3.connect(self.db)  # simulate a row written by v0.1.x (bare hash)
+        with connection:
             connection.execute("UPDATE files SET sha256 = substr(sha256, instr(sha256, ':') + 1)")
+        connection.close()
         result = ingest(self.docs, self.db)
         self.assertEqual((result.files, result.unchanged), (1, 0))
         self.assertEqual(ingest(self.docs, self.db).unchanged, 1)
+
+    def test_join_hyphenated_words(self):
+        self.assertEqual(join_hyphenated("docu-\nment"), "document")
+        self.assertEqual(join_hyphenated("the pol-\n  icy covers"), "the policy covers")
+        self.assertEqual(join_hyphenated("Jean-\nPaul"), "Jean-Paul")  # capital: keep hyphen
+        self.assertEqual(join_hyphenated("well-known and a - b"), "well-known and a - b")
+
+    def test_pdf_hyphenated_line_breaks_are_searchable(self):
+        path = self.docs / "hyphen.pdf"
+        with pymupdf.open() as doc:
+            page = doc.new_page()
+            for i, line in enumerate(["The retention pol-", "icy covers every docu-", "ment in the archive."]):
+                page.insert_text((72, 90 + i * 14), line, fontsize=10)
+            doc.save(path)
+        ingest(self.docs, self.db)
+        hit = search("retention policy document", self.db)[0]
+        self.assertIn("policy covers every document", hit["body"])
 
 
 if __name__ == "__main__":
