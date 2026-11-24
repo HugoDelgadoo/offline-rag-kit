@@ -7,7 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 ## [Unreleased]
 
 ### Added
-- `offline-rag serve [--port 8765] [--open]`: a local, read-only web interface (search passages with highlighted terms, or list files). It binds to `127.0.0.1` only, refuses requests with a foreign `Host` header, accepts only GET, sets a strict Content-Security-Policy, renders document text without HTML injection, and uses only the standard library. PDF preview with the passage highlighted is planned next.
+- `offline-rag serve [--port 8765] [--open]`: a local, read-only web interface (search passages with highlighted terms, or list files). It binds to `127.0.0.1` only, refuses requests with a foreign `Host` header, accepts only GET, sets a strict Content-Security-Policy, renders document text without HTML injection, and uses only the standard library. For PDF results, "Show page" renders the page as an image with the passage highlighted (`/preview?id=N`). The preview is found through the index (the browser never sends a path), only for files inside the indexed folder, and the PDF is opened read-only.
 
 ### Changed
 - The default index is now a fixed per-user file (`%LOCALAPPDATA%\offline-rag\index.sqlite3` on Windows, `~/Library/Application Support/offline-rag/` on macOS, `$XDG_DATA_HOME` or `~/.local/share/offline-rag/` on Linux) instead of `.offline-rag/` in the current folder, so `search` works from any directory. `--db` and the new `OFFLINE_RAG_DB` variable override it. An index left in `.offline-rag/` of the current folder is still used, with a hint, until a fixed-location index exists.

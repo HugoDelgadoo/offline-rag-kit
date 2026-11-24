@@ -73,7 +73,7 @@ offline-rag [--db PATH] serve [--port 8765] [--open]
 
 ### Web interface
 
-`offline-rag serve --open` starts a small **read-only** web page at `http://127.0.0.1:8765/` where you type words and see passages (with the matching words highlighted) or the list of files. It listens only on your own computer (`127.0.0.1`; there is no option to expose it), never modifies the index or your documents, and needs no extra packages. Index your folder first with `ingest`. Press Ctrl+C to stop it.
+`offline-rag serve --open` starts a small **read-only** web page at `http://127.0.0.1:8765/` where you type words and see passages (with the matching words highlighted) or the list of files. For PDF results, **Show page** displays the page as an image with the passage highlighted in yellow. It listens only on your own computer (`127.0.0.1`; there is no option to expose it), never modifies the index or your documents, and needs no extra packages. Index your folder first with `ingest`. Press Ctrl+C to stop it.
 
 ### Which files contain a word?
 
