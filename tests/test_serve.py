@@ -13,7 +13,7 @@ import pymupdf
 
 from offline_rag import cli
 from offline_rag.index import ingest, search
-from offline_rag.serve import PreviewError, make_server, render_preview
+from offline_rag.serve import CONTEXT_POINTS, PreviewError, make_server, render_preview
 
 
 class ServeTests(unittest.TestCase):
@@ -115,8 +115,8 @@ class PreviewTests(unittest.TestCase):
         self.hits = {h["path"]: h for h in search("quasar", self.db, 10)}
         self.pdf_before = self.pdf.read_bytes()
 
-    def png(self, passage_id):
-        data = render_preview(self.db, passage_id)
+    def png(self, passage_id, full=False):
+        data = render_preview(self.db, passage_id, full=full)
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
         return pymupdf.Pixmap(data)
 
@@ -128,10 +128,28 @@ class PreviewTests(unittest.TestCase):
 
     def test_pdf_preview_highlights_the_passage(self):
         hit = self.hits["report.pdf"]
-        pixmap = self.png(hit["id"])
+        pixmap = self.png(hit["id"], full=True)
         x0, y0, _, _ = (float(n) for n in hit["bbox"].split(","))
         zoom = pixmap.width / 595.0  # A4 width in points
+        self.assertAlmostEqual(pixmap.height / zoom, 842.0, delta=1)
         self.assert_highlighted(pixmap, ((x0 + 1) * zoom, (y0 + 1) * zoom))
+
+    def test_default_preview_is_a_band_around_the_passage(self):
+        document = pymupdf.open()
+        page = document.new_page()
+        page.insert_text((72, 600), "Zeppelin hangar inspection notes", fontsize=14)
+        document.save(self.docs / "tall.pdf")
+        document.close()
+        ingest(self.docs, self.db)
+        hit = {h["path"]: h for h in search("zeppelin", self.db, 10)}["tall.pdf"]
+        band = self.png(hit["id"])
+        whole = self.png(hit["id"], full=True)
+        self.assertEqual(band.width, whole.width)
+        self.assertLess(band.height, whole.height / 2)
+        x0, y0, _, _ = (float(n) for n in hit["bbox"].split(","))
+        zoom = band.width / 595.0
+        top = max(0.0, y0 - CONTEXT_POINTS)
+        self.assert_highlighted(band, ((x0 + 1) * zoom, (y0 + 1 - top) * zoom))
 
     def test_rotated_page_keeps_the_highlight_on_the_text(self):
         document = pymupdf.open(self.pdf)
@@ -141,7 +159,7 @@ class PreviewTests(unittest.TestCase):
         (self.root / "rot.pdf").replace(self.pdf)
         ingest(self.docs, self.db)
         hit = {h["path"]: h for h in search("quasar", self.db, 10)}["report.pdf"]
-        pixmap = self.png(hit["id"])
+        pixmap = self.png(hit["id"])  # rotated pages are always rendered whole
         x0, y0, _, _ = (float(n) for n in hit["bbox"].split(","))
         # 90 degrees clockwise: an unrotated point (x, y) lands at (page_height - y, x).
         zoom = pixmap.width / 842.0
@@ -202,6 +220,8 @@ class PreviewTests(unittest.TestCase):
         response, body = get(f"/preview?id={self.hits['report.pdf']['id']}")
         self.assertEqual((response.status, response.getheader("Content-Type")), (200, "image/png"))
         self.assertEqual(body[:4], b"\x89PNG")
+        _, whole = get(f"/preview?id={self.hits['report.pdf']['id']}&full=1")
+        self.assertLess(pymupdf.Pixmap(body).height, pymupdf.Pixmap(whole).height)
         for bad in ("/preview", "/preview?id=abc", "/preview?id=-1", "/preview?id=1;2", "/preview?id=%C2%B2"):
             self.assertEqual(get(bad)[0].status, 400, bad)
         self.assertEqual(get("/preview?id=99999")[0].status, 404)

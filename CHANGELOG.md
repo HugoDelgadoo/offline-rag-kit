@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 
 ## [Unreleased]
 
+### Changed
+- Web interface polish, following the Web Interface Guidelines: the PDF preview now shows a band of the page around the passage (with a "Show Full Page" toggle; `/preview?id=N&full=1` renders the whole page); the Files view shows the file name and its folder separately; result counts ("5 passages", "2 files"); clearer empty-state and error messages with a next step; visible hover and focus states, a real label, toggle buttons with `aria-pressed` and `aria-expanded`, non-breaking spaces, `theme-color`, touch-friendly buttons, and the search box is focused on load only on devices with a mouse.
+
 ### Fixed
 - The Windows installer starts the program as `python -m offline_rag.cli` from its private environment instead of the `offline-rag.exe` that pip generates, because that unsigned launcher is blocked on PCs with Windows App Control / Smart App Control ("a policy blocked this file"). The `offline-rag` command, the Start Menu entries and the folder picker all use it. (The installer is not part of the PyPI package, so this needs no new release.)
 
