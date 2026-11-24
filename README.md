@@ -45,10 +45,12 @@ The `ask` command uses a **local** Ollama server only. It cannot guarantee the m
 ## Command reference
 
 ```text
-offline-rag [--db PATH] ingest FOLDER
-offline-rag [--db PATH] search "TERMS" [--limit 5]
-offline-rag [--db PATH] ask "QUESTION" [--limit 5] [--model llama3.2]
+offline-rag [--db PATH] [--json] ingest FOLDER
+offline-rag [--db PATH] [--json] search "TERMS" [--limit 5]
+offline-rag [--db PATH] [--json] ask "QUESTION" [--limit 5] [--model llama3.2]
 ```
+
+`--json` (placed before the subcommand) prints a single JSON document on stdout, with the full passage text, page, bounding box and score for each hit. Errors and exit codes are unchanged and still go to stderr.
 
 ## Current capabilities and limitations
 
