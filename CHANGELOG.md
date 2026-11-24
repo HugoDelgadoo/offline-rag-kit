@@ -6,6 +6,10 @@ project uses [Semantic Versioning](https://semver.org/) (0.x versions may change
 
 ## [Unreleased]
 
+### Added
+- The web interface is available in Spanish and English: it follows the browser language (`navigator.languages`), an EN/ES button switches it and remembers the choice, and `?lang=es` forces it.
+- The web interface shows where it searches: the indexed folders with how many files and passages they hold (new `/api/info`), and says that only those folders are searched.
+
 ### Changed
 - Web interface polish, following the Web Interface Guidelines: the PDF preview now shows a band of the page around the passage (with a "Show Full Page" toggle; `/preview?id=N&full=1` renders the whole page); the Files view shows the file name and its folder separately; result counts ("5 passages", "2 files"); clearer empty-state and error messages with a next step; visible hover and focus states, a real label, toggle buttons with `aria-pressed` and `aria-expanded`, non-breaking spaces, `theme-color`, touch-friendly buttons, and the search box is focused on load only on devices with a mouse.
 

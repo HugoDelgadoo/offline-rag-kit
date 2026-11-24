@@ -45,13 +45,23 @@ INDEX_HTML = r"""<!doctype html>
   body { margin:0; background:var(--bg); color:var(--fg);
          font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 52rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 .25rem; text-wrap: balance; }
-  .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: .9rem; }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:0 0 .25rem; }
+  h1 { font-size: 1.25rem; margin: 0; text-wrap: balance; }
+  .sub { color: var(--muted); margin: 0 0 .5rem; font-size: .9rem; }
+  #where { margin-bottom: 1.5rem; }
+  #where .hint { display:block; margin-top:.25rem; }
+  .folders { list-style:none; margin:.25rem 0 0; padding:0; }
+  .folders li { color:var(--fg); overflow-wrap:anywhere; }
   .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
              clip:rect(0 0 0 0); white-space:nowrap; border:0; }
   button, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   button { font:inherit; cursor:pointer; transition: background-color .15s, color .15s, border-color .15s; }
   @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+  .lang { display:flex; border:1px solid var(--line); border-radius:.4rem; overflow:hidden; }
+  .lang button { background:transparent; color:var(--muted); border:0; padding:.2rem .6rem; font-size:.8rem; }
+  .lang button:hover { color:var(--fg); }
+  .lang button[aria-pressed=true] { background:var(--accent); color:#fff; }
+  @media (prefers-color-scheme: dark) { .lang button[aria-pressed=true] { color:#0b1220; } }
   form { display:flex; gap:.5rem; }
   input[type=search] { flex:1; min-width:0; padding:.7rem .9rem; font:inherit; color:inherit;
          background:var(--card); border:1px solid var(--line); border-radius:.5rem; }
@@ -66,8 +76,8 @@ INDEX_HTML = r"""<!doctype html>
   .views button[aria-pressed=true] { color:var(--fg); border-bottom-color:var(--accent); }
   #status { color:var(--muted); font-size:.9rem; margin:.5rem 0; font-variant-numeric: tabular-nums; }
   ol { list-style:none; padding:0; margin:0; display:grid; gap:.75rem; }
-  li { background:var(--card); border:1px solid var(--line); border-radius:.6rem; padding:.8rem 1rem;
-       min-width:0; }
+  #results > li { background:var(--card); border:1px solid var(--line); border-radius:.6rem;
+                  padding:.8rem 1rem; min-width:0; }
   .where { font-size:.85rem; color:var(--muted); margin-bottom:.3rem; overflow-wrap:anywhere; }
   .where b { color:var(--fg); font-weight:600; }
   .fname { font-weight:600; overflow-wrap:anywhere; }
@@ -86,28 +96,129 @@ INDEX_HTML = r"""<!doctype html>
 </head>
 <body>
 <main>
-  <h1>offline-rag</h1>
-  <p class="sub">Search your local index. Nothing leaves this computer.</p>
+  <div class="top">
+    <h1 translate="no">offline-rag</h1>
+    <div class="lang" id="lang" role="group" aria-label="Language / Idioma">
+      <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
+      <button type="button" data-lang="es" aria-pressed="false" lang="es">ES</button>
+    </div>
+  </div>
+  <p class="sub" id="sub"></p>
+  <div class="sub" id="where"></div>
   <form id="form" role="search">
-    <label class="sr-only" for="q">Search your documents</label>
-    <input id="q" name="q" type="search" placeholder="Try “retention policy”…" autocomplete="off"
-           autocapitalize="off" spellcheck="false" enterkeyhint="search" maxlength="500">
-    <button class="primary" type="submit">Search</button>
+    <label class="sr-only" for="q" id="q-label"></label>
+    <input id="q" name="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false"
+           enterkeyhint="search" maxlength="500">
+    <button class="primary" type="submit" id="go"></button>
   </form>
-  <div class="views" role="group" aria-label="Result view">
-    <button type="button" id="view-passages" aria-pressed="true">Passages</button>
-    <button type="button" id="view-files" aria-pressed="false">Files</button>
+  <div class="views" id="views" role="group">
+    <button type="button" id="view-passages" aria-pressed="true"></button>
+    <button type="button" id="view-files" aria-pressed="false"></button>
   </div>
   <div id="status" role="status" aria-live="polite"></div>
   <ol id="results"></ol>
 </main>
 <script>
 "use strict";
+const NBSP = " ";
+const plural = (n, one, many) => n + NBSP + (n === 1 ? one : many);
+
+// All visible text lives here. Add a language by adding an entry (and a button in #lang).
+const STRINGS = {
+  en: {
+    title: "offline-rag",
+    sub: "Search your local index. Nothing leaves this computer.",
+    where: (files, passages) => "Searching " + plural(files, "file", "files")
+      + " (" + plural(passages, "passage", "passages") + ") in the folders you indexed:",
+    more: n => "+" + n + " more",
+    whereHint: "Only these folders are searched, not the rest of your computer.",
+    whereEmpty: "The index is empty. Run “offline-rag ingest FOLDER” to add your documents.",
+    label: "Search your documents",
+    placeholder: "Try “retention policy”…",
+    go: "Search",
+    views: "Result view",
+    passages: "Passages",
+    files: "Files",
+    searching: "Searching…",
+    nonePassages: "No matching passages found. Try fewer or different words.",
+    noneFiles: "No files found. Try fewer or different words.",
+    failed: "Search failed. Check your words and try again.",
+    unreachable: "Could not reach the local server. Check that “offline-rag serve” is still running.",
+    countPassages: n => plural(n, "passage", "passages"),
+    bestPassages: n => "Showing the best " + n + " passages",
+    countFiles: n => plural(n, "file", "files"),
+    bestFiles: (n, total) => "Showing the best " + n + " of " + plural(total, "file", "files"),
+    anyWord: " (none contains every word; showing files with at least one)",
+    matches: n => plural(n, "matching passage", "matching passages"),
+    pages: "Pages",
+    page: "Page",
+    showPage: n => "Show Page" + NBSP + n,
+    hidePage: "Hide Page",
+    showFull: "Show Full Page",
+    showBand: "Show Passage Only",
+    alt: (page, path, full) => "Page " + page + " of " + path
+      + (full ? "" : ", around the passage") + ", passage highlighted",
+    previewFailed: "Preview unavailable. The file may have moved or changed: run “offline-rag ingest” again.",
+  },
+  es: {
+    title: "offline-rag",
+    sub: "Busca en tu índice local. Nada sale de este ordenador.",
+    where: (files, passages) => "Buscando en " + plural(files, "archivo", "archivos")
+      + " (" + plural(passages, "fragmento", "fragmentos") + ") de las carpetas que indexaste:",
+    more: n => "+" + n + " más",
+    whereHint: "Solo se busca en estas carpetas, no en el resto de tu ordenador.",
+    whereEmpty: "El índice está vacío. Ejecuta “offline-rag ingest CARPETA” para añadir tus documentos.",
+    label: "Buscar en tus documentos",
+    placeholder: "Prueba “política de retención”…",
+    go: "Buscar",
+    views: "Vista de resultados",
+    passages: "Fragmentos",
+    files: "Archivos",
+    searching: "Buscando…",
+    nonePassages: "No se encontró ningún fragmento. Prueba con menos palabras o palabras distintas.",
+    noneFiles: "No se encontró ningún archivo. Prueba con menos palabras o palabras distintas.",
+    failed: "La búsqueda falló. Revisa las palabras e inténtalo de nuevo.",
+    unreachable: "No se pudo conectar con el servidor local. Comprueba que “offline-rag serve” sigue en marcha.",
+    countPassages: n => plural(n, "fragmento", "fragmentos"),
+    bestPassages: n => "Mostrando los " + n + " mejores fragmentos",
+    countFiles: n => plural(n, "archivo", "archivos"),
+    bestFiles: (n, total) => "Mostrando los " + n + " mejores de " + plural(total, "archivo", "archivos"),
+    anyWord: " (ninguno contiene todas las palabras; se muestran los que contienen al menos una)",
+    matches: n => plural(n, "fragmento encontrado", "fragmentos encontrados"),
+    pages: "Páginas",
+    page: "Página",
+    showPage: n => "Mostrar página" + NBSP + n,
+    hidePage: "Ocultar página",
+    showFull: "Mostrar página completa",
+    showBand: "Mostrar solo el fragmento",
+    alt: (page, path, full) => "Página " + page + " de " + path
+      + (full ? "" : ", alrededor del fragmento") + ", fragmento resaltado",
+    previewFailed: "Vista previa no disponible. El archivo pudo moverse o cambiar: "
+      + "ejecuta “offline-rag ingest” de nuevo.",
+  },
+};
+const STORAGE_KEY = "offline-rag-lang";
+
+function pickLanguage() {
+  const asked = new URLSearchParams(location.search).get("lang");
+  if (asked && Object.hasOwn(STRINGS, asked)) return asked;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && Object.hasOwn(STRINGS, saved)) return saved;
+  } catch (error) { /* storage can be disabled */ }
+  for (const tag of navigator.languages || [navigator.language]) {
+    const base = String(tag).toLowerCase().slice(0, 2);
+    if (Object.hasOwn(STRINGS, base)) return base;
+  }
+  return "en";
+}
+let lang = pickLanguage();
+const t = (key, ...args) => { const v = STRINGS[lang][key]; return typeof v === "function" ? v(...args) : v; };
+
 const form = document.getElementById("form"), box = document.getElementById("q");
 const list = document.getElementById("results"), status = document.getElementById("status");
 const views = { passages: document.getElementById("view-passages"), files: document.getElementById("view-files") };
-const NBSP = " ";
-let view = "passages";
+let view = "passages", info = null;
 
 function el(tag, text, cls) {
   const node = document.createElement(tag);
@@ -115,7 +226,6 @@ function el(tag, text, cls) {
   if (cls) node.className = cls;
   return node;
 }
-const plural = (n, one, many) => n + NBSP + (n === 1 ? one : many);
 
 // The snippet marks matches with **...**; build DOM nodes instead of HTML so that
 // document text can never be interpreted as markup.
@@ -128,11 +238,29 @@ function snippetNode(snippet) {
 }
 function show(message) { status.textContent = message; list.replaceChildren(); }
 
+// Where is it searching? The indexed folders, with how many files and passages they hold.
+function renderWhere() {
+  const target = document.getElementById("where");
+  target.replaceChildren();
+  if (!info) return;
+  if (!info.files) { target.textContent = t("whereEmpty"); return; }
+  target.appendChild(document.createTextNode(t("where", info.files, info.passages)));
+  const folders = el("ul", undefined, "folders");
+  info.folders.slice(0, 3).forEach(f => {
+    const item = el("li", f.path);
+    item.translate = false;
+    folders.appendChild(item);
+  });
+  if (info.folders.length > 3) folders.appendChild(el("li", t("more", info.folders.length - 3)));
+  target.appendChild(folders);
+  target.appendChild(el("span", t("whereHint"), "hint"));
+}
+
 // "Show Page" loads /preview?id=N: a band of the PDF page around the passage, highlighted.
 // "Show Full Page" loads the whole page.
 function previewControl(r) {
   const wrap = el("div", undefined, "actions");
-  const toggle = el("button", "Show Page" + NBSP + r.page, "ghost");
+  const toggle = el("button", t("showPage", r.page), "ghost");
   toggle.type = "button";
   toggle.setAttribute("aria-expanded", "false");
   let image = null, note = null, fullButton = null, full = false;
@@ -140,7 +268,7 @@ function previewControl(r) {
   function load() {
     image.className = "preview";
     image.style.aspectRatio = full ? "auto 1 / 1.414" : "auto 3 / 1";
-    image.alt = "Page " + r.page + " of " + r.path + (full ? "" : ", around the passage") + ", passage highlighted";
+    image.alt = t("alt", r.page, r.path, full);
     image.src = "/preview?id=" + encodeURIComponent(r.id) + (full ? "&full=1" : "");
   }
   function close() {
@@ -148,7 +276,7 @@ function previewControl(r) {
     if (note) note.remove();
     if (fullButton) fullButton.remove();
     image = note = fullButton = null; full = false;
-    toggle.textContent = "Show Page" + NBSP + r.page;
+    toggle.textContent = t("showPage", r.page);
     toggle.setAttribute("aria-expanded", "false");
   }
   toggle.addEventListener("click", () => {
@@ -156,22 +284,22 @@ function previewControl(r) {
     image = document.createElement("img");
     image.addEventListener("error", () => {
       if (!image) return;
-      note = el("p", "Preview unavailable. The file may have moved or changed: run “offline-rag ingest” again.", "err");
+      note = el("p", t("previewFailed"), "err");
       image.remove(); image = null;
       if (fullButton) { fullButton.remove(); fullButton = null; }
       wrap.parentNode.appendChild(note);
     });
     load();
-    fullButton = el("button", "Show Full Page", "ghost");
+    fullButton = el("button", t("showFull"), "ghost");
     fullButton.type = "button";
     fullButton.addEventListener("click", () => {
       full = !full;
-      fullButton.textContent = full ? "Show Passage Only" : "Show Full Page";
+      fullButton.textContent = full ? t("showBand") : t("showFull");
       load();
     });
     wrap.appendChild(fullButton);
     wrap.parentNode.appendChild(image);
-    toggle.textContent = "Hide Page";
+    toggle.textContent = t("hidePage");
     toggle.setAttribute("aria-expanded", "true");
   });
   wrap.appendChild(toggle);
@@ -182,10 +310,12 @@ function fileNode(f) {
   const item = el("li");
   const name = f.relative_path.split(/[\\/]/).pop();
   const dir = f.path.slice(0, f.path.length - name.length).replace(/[\\/]+$/, "");
-  item.appendChild(el("div", name, "fname"));
-  item.appendChild(el("div", dir, "dir"));
-  item.appendChild(el("p", plural(f.matches, "matching passage", "matching passages")
-    + (f.pages.length ? " · Pages" + NBSP + f.pages.join(", ") : ""), "small"));
+  const fname = el("div", name, "fname"), where = el("div", dir, "dir");
+  fname.translate = where.translate = false;
+  item.appendChild(fname);
+  item.appendChild(where);
+  item.appendChild(el("p", t("matches", f.matches)
+    + (f.pages.length ? " · " + t("pages") + NBSP + f.pages.join(", ") : ""), "small"));
   return item;
 }
 
@@ -194,7 +324,7 @@ function passageNode(r) {
   const name = el("b", r.path);
   name.translate = false;
   where.appendChild(name);
-  if (r.page) where.appendChild(document.createTextNode(" · Page" + NBSP + r.page));
+  if (r.page) where.appendChild(document.createTextNode(" · " + t("page") + NBSP + r.page));
   item.appendChild(where);
   item.appendChild(snippetNode(r.snippet));
   if (r.page) item.appendChild(previewControl(r));
@@ -208,38 +338,66 @@ async function run() {
   else { url.searchParams.delete("q"); url.searchParams.delete("view"); }
   history.replaceState(null, "", url);
   if (!q) return show("");
-  status.textContent = "Searching…";
+  status.textContent = t("searching");
   let data;
   try {
     const response = await fetch("/api/" + (view === "files" ? "files" : "search") + "?q=" + encodeURIComponent(q));
     data = await response.json();
-    if (!response.ok) return show((data.error || "Search failed.") + " Check your words and try again.");
+    if (!response.ok) return show(t("failed"));
   } catch (error) {
-    return show("Could not reach the local server. Check that “offline-rag serve” is still running.");
+    return show(t("unreachable"));
   }
   list.replaceChildren();
   if (view === "files") {
-    if (!data.files.length) return show("No files found. Try fewer or different words.");
+    if (!data.files.length) return show(t("noneFiles"));
     status.textContent = data.total > data.files.length
-      ? "Showing the best " + data.files.length + " of " + plural(data.total, "file", "files")
-      : plural(data.total, "file", "files")
-        + (data.match === "any" ? " (none contains every word; showing files with at least one)" : "");
+      ? t("bestFiles", data.files.length, data.total)
+      : t("countFiles", data.total) + (data.match === "any" ? t("anyWord") : "");
     data.files.forEach(f => list.appendChild(fileNode(f)));
   } else {
-    if (!data.results.length) return show("No matching passages found. Try fewer or different words.");
+    if (!data.results.length) return show(t("nonePassages"));
     const n = data.results.length;
-    status.textContent = n >= 10 ? "Showing the best " + n + " passages" : plural(n, "passage", "passages");
+    status.textContent = n >= 10 ? t("bestPassages", n) : t("countPassages", n);
     data.results.forEach(r => list.appendChild(passageNode(r)));
   }
+}
+
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  document.title = t("title");
+  document.getElementById("sub").textContent = t("sub");
+  document.getElementById("q-label").textContent = t("label");
+  box.placeholder = t("placeholder");
+  document.getElementById("go").textContent = t("go");
+  document.getElementById("views").setAttribute("aria-label", t("views"));
+  views.passages.textContent = t("passages");
+  views.files.textContent = t("files");
+  document.querySelectorAll("#lang button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  renderWhere();
+}
+function setLanguage(next) {
+  lang = next;
+  try { localStorage.setItem(STORAGE_KEY, next); } catch (error) { /* ignore */ }
+  const url = new URL(location.href);
+  url.searchParams.set("lang", next);
+  history.replaceState(null, "", url);
+  applyLanguage();
+  if (box.value.trim()) run();
 }
 function select(next) {
   view = next;
   for (const [name, button] of Object.entries(views)) button.setAttribute("aria-pressed", String(name === next));
   run();
 }
+
+document.querySelectorAll("#lang button").forEach(b => b.addEventListener("click", () => setLanguage(b.dataset.lang)));
 views.passages.addEventListener("click", () => select("passages"));
 views.files.addEventListener("click", () => select("files"));
 form.addEventListener("submit", event => { event.preventDefault(); run(); });
+
+applyLanguage();
+fetch("/api/info").then(r => r.json()).then(data => { info = data; renderWhere(); }).catch(() => {});
 const params = new URLSearchParams(location.search);
 if (params.get("q")) { box.value = params.get("q"); select(params.get("view") === "files" ? "files" : "passages"); }
 if (window.matchMedia("(pointer: fine)").matches) box.focus();  // not on touch screens
@@ -257,6 +415,21 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
+
+
+def index_info(database: str | Path) -> dict:
+    """What the index contains: the indexed folders and how many files and passages they hold."""
+    uri = Path(database).expanduser().resolve().as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
+        folders = connection.execute(
+            "SELECT root, COUNT(*) FROM files GROUP BY root ORDER BY root"
+        ).fetchall()
+        passages = connection.execute("SELECT COUNT(*) FROM passages").fetchone()[0]
+    return {
+        "folders": [{"path": root, "files": count} for root, count in folders],
+        "files": sum(count for _, count in folders),
+        "passages": passages,
+    }
 
 
 class PreviewError(Exception):
@@ -359,6 +532,11 @@ class _Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         if url.path == "/":
             return self._send(200, INDEX_HTML.encode("utf-8"), "text/html; charset=utf-8")
+        if url.path == "/api/info":
+            try:
+                return self._json(200, index_info(self.server.database))
+            except (OSError, sqlite3.Error) as exc:
+                return self._json(500, {"error": str(exc)})
         if url.path in ("/api/search", "/api/files"):
             query = parse_qs(url.query).get("q", [""])[0].strip()
             if not query:

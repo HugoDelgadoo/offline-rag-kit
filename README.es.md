@@ -88,7 +88,7 @@ offline-rag [--db RUTA] serve [--port 8765] [--open]
 
 ### Interfaz web
 
-`offline-rag serve --open` abre una pequeña página **de solo lectura** en `http://127.0.0.1:8765/` donde escribes palabras y ves los fragmentos (con las palabras resaltadas) o la lista de archivos. En los resultados de PDF, **Show page** muestra la página como imagen con el fragmento resaltado en amarillo. Solo escucha en tu propio ordenador (`127.0.0.1`; no hay opción para exponerla), nunca modifica el índice ni tus documentos y no necesita paquetes extra. Indexa antes tu carpeta con `ingest`. Pulsa Ctrl+C para detenerla.
+`offline-rag serve --open` abre una pequeña página **de solo lectura** en `http://127.0.0.1:8765/` donde escribes palabras y ves los fragmentos (con las palabras resaltadas) o la lista de archivos. En los resultados de PDF, **Show page** muestra la página como imagen con el fragmento resaltado en amarillo. Solo escucha en tu propio ordenador (`127.0.0.1`; no hay opción para exponerla), nunca modifica el índice ni tus documentos y no necesita paquetes extra. Indexa antes tu carpeta con `ingest`. La página está en español o inglés (se elige según tu navegador y se cambia con el botón EN/ES) y siempre muestra en qué carpetas busca y cuántos archivos y fragmentos contienen. Pulsa Ctrl+C para detenerla.
 
 ### ¿Qué archivos contienen una palabra?
 
