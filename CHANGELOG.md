@@ -21,10 +21,15 @@ First public alpha: a retrieval-first prototype for private, local document sear
   security and contribution documents.
 
 ### Changed
+- Citations and `--json` paths are relative to the ingested folder; the index stores the root
+  separately. Indexes from earlier builds must be rebuilt (a clear error says so).
+- `search` prints a snippet around the matching terms (`**term**`) and `--json` adds a `snippet` field.
+- Use `import pymupdf` (no more `fitz` deprecation warning); requires PyMuPDF >= 1.24.3.
 - Repository reorganized into `src/offline_rag/`, `tests/`, `docs/`, `demo/` and
   `.github/workflows/` so the package installs and CI runs.
 
 ### Fixed
+- Moving or renaming a document folder no longer leaves duplicate passages after re-ingesting.
 - A corrupt, encrypted or non-UTF-8 file no longer aborts ingestion; it is skipped and
   reported (warning on stderr, or in the `skipped` list with `--json`).
 - Re-ingesting a folder removes passages of files deleted from it, leaving other folders

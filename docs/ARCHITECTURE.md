@@ -26,7 +26,7 @@ The application opens only local files and creates a local SQLite database. Opti
 
 ## How citations work
 
-`fitz.Page.get_text("blocks")` returns text blocks and their (x0,y0,x1,y1) coordinates in PDF points. Each searchable block stores its source path, 1-based page number, and bounding box; the CLI prints them alongside search hits. Text documents get a filename citation. This does not yet produce highlighted PDF overlays or claim-exact coordinates.
+`pymupdf.Page.get_text("blocks")` returns text blocks and their (x0,y0,x1,y1) coordinates in PDF points. Each searchable block stores the ingested folder and its path relative to it, 1-based page number, and bounding box; the CLI prints them alongside search hits. Text documents get a filename citation. This does not yet produce highlighted PDF overlays or claim-exact coordinates.
 
 ## Evaluation direction
 

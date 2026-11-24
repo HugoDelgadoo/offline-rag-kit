@@ -45,6 +45,7 @@ class CliJsonTests(unittest.TestCase):
         self.assertIsNone(hit["page"])
         self.assertIsNone(hit["bbox"])
         self.assertIn("Ünïcode", hit["text"])
+        self.assertIn("**SQLite**", hit["snippet"])
 
     def test_search_json_without_hits_is_empty_list(self):
         self.run_cli("--db", self.db, "ingest", self.docs.as_posix())

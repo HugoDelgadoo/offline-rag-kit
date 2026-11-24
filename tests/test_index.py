@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from offline_rag.index import citation, ingest, search
 
@@ -33,7 +33,7 @@ class IndexTests(unittest.TestCase):
 
     def test_pdf_source_has_page_and_coordinates(self):
         path = self.docs / "example.pdf"
-        with fitz.open() as doc:
+        with pymupdf.open() as doc:
             page = doc.new_page()
             page.insert_text((72, 90), "Evidence in a PDF page")
             doc.save(path)
@@ -96,6 +96,40 @@ class IndexTests(unittest.TestCase):
         (self.docs / "a.md").write_text("sqlite sqlite storage", encoding="utf-8")
         ingest(self.docs, self.db)
         self.assertEqual(len(search("sqlite sqlite NOT AND OR storage", self.db)), 1)
+
+    def test_citations_use_paths_relative_to_ingested_folder(self):
+        (self.docs / "sub").mkdir()
+        (self.docs / "sub" / "deep.md").write_text("nested note", encoding="utf-8")
+        ingest(self.docs, self.db)
+        hit = search("nested", self.db)[0]
+        self.assertEqual(hit["path"], "sub/deep.md")
+        self.assertEqual(citation(hit), "sub/deep.md")
+        self.assertNotIn(self.tmp.name, hit["path"])
+
+    def test_moving_the_folder_does_not_duplicate_passages(self):
+        (self.docs / "note.md").write_text("portable knowledge", encoding="utf-8")
+        ingest(self.docs, self.db)
+        moved = self.root / "moved"
+        self.docs.rename(moved)
+        ingest(moved, self.db)
+        self.assertEqual(len(search("portable", self.db)), 1)
+
+    def test_old_absolute_path_index_gives_clear_error(self):
+        import sqlite3
+
+        with sqlite3.connect(self.db) as old:
+            old.execute("CREATE VIRTUAL TABLE passages USING fts5(path UNINDEXED, page UNINDEXED, bbox UNINDEXED, body)")
+        old.close()
+        with self.assertRaisesRegex(ValueError, "older version"):
+            search("anything", self.db)
+
+    def test_snippet_shows_match_far_from_start(self):
+        filler = " ".join(f"word{i}" for i in range(300))
+        (self.docs / "long.md").write_text(f"{filler} needle {filler}", encoding="utf-8")
+        ingest(self.docs, self.db)
+        hit = search("needle", self.db)[0]
+        self.assertIn("**needle**", hit["snippet"])
+        self.assertLess(len(hit["snippet"]), len(hit["body"]))
 
 
 if __name__ == "__main__":

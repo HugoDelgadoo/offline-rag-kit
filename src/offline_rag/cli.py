@@ -38,6 +38,7 @@ def _hit_json(rank: int, hit: dict) -> dict:
         "page": hit["page"] or None,
         "bbox": [float(n) for n in hit["bbox"].split(",")] if hit["bbox"] else None,
         "score": hit["score"],
+        "snippet": hit["snippet"],
         "text": hit["body"],
     }
 
@@ -71,7 +72,7 @@ def main(argv: list[str] | None = None) -> None:
                     if not hits:
                         print("No matching passages found.")
                     for rank, hit in enumerate(hits, start=1):
-                        print(f"\n[{rank}] {citation(hit)}\n{hit['body'][:700]}")
+                        print(f"\n[{rank}] {citation(hit)}\n{hit['snippet']}")
             else:
                 answer = answer_with_ollama(args.query, hits, model=args.model)
                 if args.json:
