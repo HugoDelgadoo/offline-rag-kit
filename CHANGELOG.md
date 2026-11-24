@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
-## [Unreleased]
+## [0.1.2] - 2026-11-24
 
 ### Added
 - PDF words split by a hyphen at a line end ("docu-\nment") are rejoined so they can be found; a compound split exactly at a line end loses its hyphen.
@@ -58,5 +58,6 @@ First public alpha: a retrieval-first prototype for private, local document sear
 - Lexical search only; semantic/vector retrieval is planned (see [ROADMAP](ROADMAP.md)).
 - Single-user prototype, not a hardened multi-user service.
 
+[0.1.2]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.2
 [0.1.1]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.1
 [0.1.0]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.0
