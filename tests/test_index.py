@@ -43,6 +43,36 @@ class IndexTests(unittest.TestCase):
         self.assertEqual(len(result["bbox"].split(",")), 4)
         self.assertIn("page 1", citation(result))
 
+    def test_removed_files_are_dropped_on_reingest(self):
+        keep, gone = self.docs / "keep.md", self.docs / "gone.md"
+        keep.write_text("alpha topic", encoding="utf-8")
+        gone.write_text("beta topic", encoding="utf-8")
+        ingest(self.docs, self.db)
+        self.assertEqual(len(search("beta", self.db)), 1)
+        gone.unlink()
+        self.assertEqual(ingest(self.docs, self.db), (1, 1))
+        self.assertEqual(search("beta", self.db), [])
+        self.assertEqual(len(search("alpha", self.db)), 1)
+
+    def test_stale_cleanup_ignores_other_folders(self):
+        other = self.root / "other"
+        other.mkdir()
+        (other / "o.md").write_text("gamma topic", encoding="utf-8")
+        (self.docs / "d.md").write_text("delta topic", encoding="utf-8")
+        ingest(other, self.db)
+        ingest(self.docs, self.db)
+        self.assertEqual(len(search("gamma", self.db)), 1)
+
+    def test_broken_files_are_skipped_and_reported(self):
+        (self.docs / "good.md").write_text("good content", encoding="utf-8")
+        (self.docs / "broken.pdf").write_bytes(b"not a real pdf")
+        (self.docs / "latin.txt").write_bytes("caf\xe9".encode("latin-1"))
+        errors = []
+        counts = ingest(self.docs, self.db, on_error=lambda p, e: errors.append(p.name))
+        self.assertEqual(counts, (1, 1))
+        self.assertCountEqual(errors, ["broken.pdf", "latin.txt"])
+        self.assertEqual(len(search("good", self.db)), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

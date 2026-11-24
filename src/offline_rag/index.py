@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
+from contextlib import closing
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 import fitz
 
@@ -50,8 +52,18 @@ def extract_passages(path: Path) -> Iterator[tuple[int, str, str]]:
                 yield 0, "", body
 
 
-def ingest(folder: str | Path, database: str | Path) -> tuple[int, int]:
-    """Index all documents recursively; re-ingesting a file replaces its passages."""
+def ingest(
+    folder: str | Path,
+    database: str | Path,
+    on_error: Callable[[Path, Exception], None] | None = None,
+) -> tuple[int, int]:
+    """Index all documents recursively; re-ingesting a file replaces its passages.
+
+    Files that cannot be read (corrupt or encrypted PDFs, non-UTF-8 text) are
+    skipped and reported through ``on_error``; their previous passages, if any,
+    are kept. Passages of files that no longer exist under ``folder`` are removed.
+    Returns (files indexed, passages indexed).
+    """
     root = Path(folder).expanduser().resolve()
     if not root.is_dir():
         raise ValueError(f"Folder not found: {root}")
@@ -59,18 +71,35 @@ def ingest(folder: str | Path, database: str | Path) -> tuple[int, int]:
         path for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
     )
+    file_count = 0
     passage_count = 0
-    with open_index(database) as connection:
+    with closing(open_index(database)) as connection:
         for path in documents:
-            entries = list(extract_passages(path))
+            try:
+                entries = list(extract_passages(path))
+            except Exception as exc:  # parsers raise many different error types
+                if on_error:
+                    on_error(path, exc)
+                continue
             with connection:
                 connection.execute("DELETE FROM passages WHERE path = ?", (str(path),))
                 connection.executemany(
                     "INSERT INTO passages (path, page, bbox, body) VALUES (?, ?, ?, ?)",
                     ((str(path), page, bbox, body) for page, bbox, body in entries),
                 )
+            file_count += 1
             passage_count += len(entries)
-    return len(documents), passage_count
+        _remove_stale(connection, root, {str(path) for path in documents})
+    return file_count, passage_count
+
+
+def _remove_stale(connection: sqlite3.Connection, root: Path, present: set[str]) -> None:
+    """Delete passages of files under ``root`` that are no longer on disk."""
+    prefix = str(root) + os.sep
+    indexed = [row[0] for row in connection.execute("SELECT DISTINCT path FROM passages")]
+    stale = [path for path in indexed if path.startswith(prefix) and path not in present]
+    with connection:
+        connection.executemany("DELETE FROM passages WHERE path = ?", ((p,) for p in stale))
 
 
 def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
@@ -81,7 +110,7 @@ def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
         return []
     # Quoting every user token avoids injecting FTS5 operators or syntax.
     fts_query = " OR ".join(f'"{token}"' for token in tokens)
-    with open_index(database) as connection:
+    with closing(open_index(database)) as connection:
         rows = connection.execute(
             """SELECT path, page, bbox, body, bm25(passages) AS score
                FROM passages

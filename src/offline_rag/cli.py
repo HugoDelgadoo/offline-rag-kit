@@ -27,7 +27,10 @@ def main() -> None:
     args = parser.parse_args()
     try:
         if args.command == "ingest":
-            files, passages = ingest(args.folder, args.db)
+            def warn(path, exc):
+                print(f"Warning: skipped {path}: {exc}", file=sys.stderr)
+
+            files, passages = ingest(args.folder, args.db, on_error=warn)
             print(f"Indexed {files} files and {passages} passages in {args.db}")
         else:
             hits = search(args.query, args.db, args.limit)
