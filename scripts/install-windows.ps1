@@ -123,17 +123,18 @@ $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 $root = Split-Path $InstallDir -Parent
 $binDir = Join-Path $root 'bin'
 $venvPython = Join-Path $InstallDir 'Scripts\python.exe'
-$appExe = Join-Path $InstallDir 'Scripts\offline-rag.exe'
+# The program is started as "python -m offline_rag.cli" instead of the offline-rag.exe that pip generates:
+# that unsigned launcher is blocked on PCs with Windows App Control / Smart App Control.
+$appArgs = '-m offline_rag.cli'
 
 Invoke-Checked 'Creating the private environment' $python @('-m', 'venv', $InstallDir)
 Invoke-Checked 'Installing offline-rag-kit' $venvPython @('-m', 'pip', 'install', '--upgrade', '--disable-pip-version-check', $Source)
-if (-not (Test-Path $appExe)) { throw "Installation finished but $appExe was not created." }
-Invoke-Checked 'Checking the installed program' $appExe @('--help') | Out-Null
+Invoke-Checked 'Checking the installed program' $venvPython @('-m', 'offline_rag.cli', '--help') | Out-Null
 
 # A tiny launcher folder is put on PATH instead of the environment's Scripts folder, so the
 # private python.exe/pip.exe never shadow your own Python.
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-Set-Content -Path (Join-Path $binDir 'offline-rag.cmd') -Encoding ASCII -Value "@`"$appExe`" %*"
+Set-Content -Path (Join-Path $binDir 'offline-rag.cmd') -Encoding ASCII -Value "@`"$venvPython`" $appArgs %*"
 
 if (-not $NoPath) {
     if (Add-UserPath $binDir) { Write-Host "Added $binDir to your PATH (open a new terminal to use 'offline-rag')." }
@@ -146,20 +147,20 @@ if (-not $NoShortcuts) {
     Set-Content -Path $launcher -Encoding ASCII -Value @(
         '@echo off',
         'title Offline RAG',
-        "`"$appExe`" serve --open",
+        "`"$venvPython`" $appArgs serve --open",
         'if errorlevel 1 pause'
     )
     New-Shortcut -Path (Join-Path $StartMenuDir 'Offline RAG.lnk') -Target $launcher -Arguments '' `
         -Description 'Search your documents in a local web page'
 
-    $quotedExe = $appExe.Replace("'", "''")
+    $quotedExe = $venvPython.Replace("'", "''")
     $indexScript = Join-Path $root 'index-a-folder.ps1'
     Set-Content -Path $indexScript -Encoding UTF8 -Value @"
 Add-Type -AssemblyName System.Windows.Forms
 `$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
 `$dialog.Description = 'Choose the folder with your PDF, Markdown and text files'
 if (`$dialog.ShowDialog() -eq 'OK') {
-    & '$quotedExe' ingest `$dialog.SelectedPath
+    & '$quotedExe' -m offline_rag.cli ingest `$dialog.SelectedPath
 }
 Read-Host 'Press Enter to close'
 "@
@@ -174,7 +175,7 @@ if (-not $IndexFolder -and -not $NoPrompt) {
     try { $IndexFolder = Read-Host 'Folder to index now (press Enter to skip)' } catch { $IndexFolder = $null }
 }
 if ($IndexFolder) {
-    Invoke-Checked 'Indexing the folder' $appExe @('ingest', $IndexFolder)
+    Invoke-Checked 'Indexing the folder' $venvPython @('-m', 'offline_rag.cli', 'ingest', $IndexFolder)
 }
 
 Write-Host ''
