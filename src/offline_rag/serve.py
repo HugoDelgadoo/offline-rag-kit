@@ -6,14 +6,23 @@ the loopback address are refused (protection against DNS rebinding).
 """
 
 import json
+import sqlite3
+import threading
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+
+import pymupdf
 
 from .index import search, search_files
 
 LOOPBACK = "127.0.0.1"
 MAX_QUERY_CHARS = 500
+MAX_PREVIEW_PIXELS = 1600  # width of the rendered page image
+HIGHLIGHT_FILL = (1.0, 0.85, 0.0)
+
+_render_lock = threading.Lock()  # PyMuPDF is not thread-safe
 
 INDEX_HTML = """<!doctype html>
 <html lang="en">
@@ -50,6 +59,11 @@ INDEX_HTML = """<!doctype html>
   .where b { color:var(--fg); font-weight:600; }
   mark { background:var(--mark); color:inherit; border-radius:.2rem; padding:0 .1rem; }
   p { margin:0; }
+  .linkbtn { background:none; color:var(--accent); padding:0; margin-top:.5rem; font-size:.9rem;
+             text-decoration:underline; }
+  img.preview { display:block; max-width:100%; height:auto; margin-top:.6rem; background:#fff;
+                border:1px solid var(--line); border-radius:.4rem; }
+  .err { color:var(--muted); font-size:.9rem; margin-top:.5rem; }
 </style>
 </head>
 <body>
@@ -90,6 +104,27 @@ function snippetNode(snippet) {
   });
   return p;
 }
+// "Show page" loads /preview?id=N, the PDF page as an image with the passage highlighted.
+function previewControl(r) {
+  const wrap = el("div"), label = "Show page " + r.page;
+  const button = el("button", label, "linkbtn");
+  button.type = "button";
+  let open = null;
+  button.addEventListener("click", () => {
+    if (open) { open.remove(); open = null; button.textContent = label; return; }
+    const img = document.createElement("img");
+    img.className = "preview";
+    img.alt = "Page " + r.page + " of " + r.path + " with the passage highlighted";
+    img.addEventListener("error", () => {
+      const note = el("p", "Preview not available: the file may have moved or changed. Run ingest again.", "err");
+      img.replaceWith(note); open = note;
+    });
+    img.src = "/preview?id=" + encodeURIComponent(r.id);
+    wrap.appendChild(img); open = img; button.textContent = "Hide page";
+  });
+  wrap.prepend(button);
+  return wrap;
+}
 function show(message) { status.textContent = message; list.replaceChildren(); }
 
 async function run() {
@@ -125,6 +160,7 @@ async function run() {
       if (r.page) where.appendChild(document.createTextNode(" · page " + r.page));
       item.appendChild(where);
       item.appendChild(snippetNode(r.snippet));
+      if (r.page) item.appendChild(previewControl(r));
       list.appendChild(item);
     });
   }
@@ -147,12 +183,62 @@ if (params.get("q")) { box.value = params.get("q"); select(params.get("view") ==
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+        "connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
     ),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
+
+
+class PreviewError(Exception):
+    """The preview cannot be produced; ``status`` is the HTTP status to answer with."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def render_preview(database: str | Path, passage_id: int) -> bytes:
+    """Render the PDF page of an indexed passage as PNG with the passage highlighted.
+
+    The file is found through the index (never through a path sent by the browser), must sit
+    inside the folder that was ingested, and is opened read-only and never saved.
+    """
+    uri = Path(database).expanduser().resolve().as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
+        row = connection.execute(
+            "SELECT root, path, page, bbox FROM passages WHERE rowid = ?", (passage_id,)
+        ).fetchone()
+    if row is None:
+        raise PreviewError(404, "Unknown passage.")
+    root, relative, page_number, bbox = row
+    if not page_number or not relative.lower().endswith(".pdf"):
+        raise PreviewError(404, "Only PDF passages have a preview.")
+    root_path = Path(root).resolve()
+    file = (root_path / relative).resolve()
+    if not file.is_relative_to(root_path):
+        raise PreviewError(403, "The file is outside the indexed folder.")
+    if not file.is_file():
+        raise PreviewError(404, "The file is no longer there. Run 'offline-rag ingest' again.")
+    try:
+        with _render_lock, pymupdf.open(file) as document:
+            if not 1 <= int(page_number) <= document.page_count:
+                raise PreviewError(404, "The file changed since it was indexed. Run 'offline-rag ingest' again.")
+            page = document[int(page_number) - 1]
+            if bbox:
+                # Stored in the same (unrotated) space PyMuPDF draws in.
+                x0, y0, x1, y1 = (float(n) for n in bbox.split(","))
+                page.draw_rect(
+                    pymupdf.Rect(x0, y0, x1, y1), color=HIGHLIGHT_FILL, fill=HIGHLIGHT_FILL,
+                    fill_opacity=0.35, width=1.2,
+                )
+            zoom = min(2.0, MAX_PREVIEW_PIXELS / max(page.rect.width, 1.0))
+            return page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False).tobytes("png")
+    except PreviewError:
+        raise
+    except (RuntimeError, ValueError) as exc:  # damaged or encrypted PDF, bad stored bbox
+        raise PreviewError(422, f"The page could not be rendered: {exc}") from exc
 
 
 def _hit_payload(hit: dict) -> dict:
@@ -209,6 +295,17 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"query": query, **search_files(query, self.server.database, 50)})
             except (OSError, ValueError) as exc:
                 return self._json(500, {"error": str(exc)})
+        if url.path == "/preview":
+            raw = parse_qs(url.query).get("id", [""])[0]
+            if not raw.isascii() or not raw.isdigit():
+                return self._json(400, {"error": "Missing or invalid passage id."})
+            try:
+                png = render_preview(self.server.database, int(raw))
+            except PreviewError as exc:
+                return self._json(exc.status, {"error": str(exc)})
+            except (OSError, sqlite3.Error) as exc:
+                return self._json(500, {"error": str(exc)})
+            return self._send(200, png, "image/png")
         self._json(404, {"error": "Not found."})
 
     def _method_not_allowed(self):

@@ -2,14 +2,18 @@
 
 import http.client
 import json
+import sqlite3
 import tempfile
 import threading
 import unittest
+from contextlib import closing
 from pathlib import Path
 
+import pymupdf
+
 from offline_rag import cli
-from offline_rag.index import ingest
-from offline_rag.serve import make_server
+from offline_rag.index import ingest, search
+from offline_rag.serve import PreviewError, make_server, render_preview
 
 
 class ServeTests(unittest.TestCase):
@@ -90,6 +94,118 @@ class ServeTests(unittest.TestCase):
         self.request("GET", "/api/search?q=retention")
         self.request("GET", "/api/files?q=retention")
         self.assertEqual(self.db.read_bytes(), self.before)
+
+
+class PreviewTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.docs = self.root / "docs"
+        self.docs.mkdir()
+        (self.docs / "notes.md").write_text("markdown about a quasar", encoding="utf-8")
+        self.pdf = self.docs / "report.pdf"
+        document = pymupdf.open()
+        page = document.new_page()
+        page.insert_text((72, 100), "Quasar luminosity report", fontsize=14)
+        document.save(self.pdf)
+        document.close()
+        self.db = self.root / "i.sqlite3"
+        ingest(self.docs, self.db)
+        self.hits = {h["path"]: h for h in search("quasar", self.db, 10)}
+        self.pdf_before = self.pdf.read_bytes()
+
+    def png(self, passage_id):
+        data = render_preview(self.db, passage_id)
+        self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+        return pymupdf.Pixmap(data)
+
+    def assert_highlighted(self, pixmap, point):
+        """The pixel is the yellow tint of the highlight, not white paper."""
+        r, g, b = pixmap.pixel(int(point[0]), int(point[1]))[:3]
+        self.assertGreater(r, 240)
+        self.assertLess(b, 200)
+
+    def test_pdf_preview_highlights_the_passage(self):
+        hit = self.hits["report.pdf"]
+        pixmap = self.png(hit["id"])
+        x0, y0, _, _ = (float(n) for n in hit["bbox"].split(","))
+        zoom = pixmap.width / 595.0  # A4 width in points
+        self.assert_highlighted(pixmap, ((x0 + 1) * zoom, (y0 + 1) * zoom))
+
+    def test_rotated_page_keeps_the_highlight_on_the_text(self):
+        document = pymupdf.open(self.pdf)
+        document[0].set_rotation(90)
+        document.save(self.root / "rot.pdf")
+        document.close()
+        (self.root / "rot.pdf").replace(self.pdf)
+        ingest(self.docs, self.db)
+        hit = {h["path"]: h for h in search("quasar", self.db, 10)}["report.pdf"]
+        pixmap = self.png(hit["id"])
+        x0, y0, _, _ = (float(n) for n in hit["bbox"].split(","))
+        # 90 degrees clockwise: an unrotated point (x, y) lands at (page_height - y, x).
+        zoom = pixmap.width / 842.0
+        self.assert_highlighted(pixmap, ((842.0 - (y0 + 1)) * zoom, (x0 + 1) * zoom))
+
+    def test_text_files_have_no_preview(self):
+        with self.assertRaises(PreviewError) as raised:
+            render_preview(self.db, self.hits["notes.md"]["id"])
+        self.assertEqual(raised.exception.status, 404)
+
+    def test_unknown_id_and_missing_file(self):
+        with self.assertRaises(PreviewError) as raised:
+            render_preview(self.db, 99999)
+        self.assertEqual(raised.exception.status, 404)
+        self.pdf.unlink()
+        with self.assertRaises(PreviewError) as raised:
+            render_preview(self.db, self.hits["report.pdf"]["id"])
+        self.assertEqual(raised.exception.status, 404)
+
+    def test_file_outside_the_indexed_folder_is_refused(self):
+        (self.root / "secret.pdf").write_bytes(self.pdf.read_bytes())
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("UPDATE passages SET path = ? WHERE path = 'report.pdf'", ("../secret.pdf",))
+        with self.assertRaises(PreviewError) as raised:
+            render_preview(self.db, self.hits["report.pdf"]["id"])
+        self.assertEqual(raised.exception.status, 403)
+
+    def test_changed_file_with_fewer_pages_is_a_clean_error(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("UPDATE passages SET page = 7 WHERE path = 'report.pdf'")
+        with self.assertRaises(PreviewError) as raised:
+            render_preview(self.db, self.hits["report.pdf"]["id"])
+        self.assertEqual(raised.exception.status, 404)
+
+    def test_preview_never_modifies_the_pdf_or_the_index(self):
+        index_before = self.db.read_bytes()
+        self.png(self.hits["report.pdf"]["id"])
+        self.assertEqual(self.pdf.read_bytes(), self.pdf_before)
+        self.assertEqual(self.db.read_bytes(), index_before)
+
+    def test_http_endpoint(self):
+        server = make_server(self.db, 0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 5)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        port = server.server_address[1]
+
+        def get(path):
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            connection.request("GET", path, headers={"Host": f"127.0.0.1:{port}"})
+            response = connection.getresponse()
+            body = response.read()
+            connection.close()
+            return response, body
+
+        response, body = get(f"/preview?id={self.hits['report.pdf']['id']}")
+        self.assertEqual((response.status, response.getheader("Content-Type")), (200, "image/png"))
+        self.assertEqual(body[:4], b"\x89PNG")
+        for bad in ("/preview", "/preview?id=abc", "/preview?id=-1", "/preview?id=1;2", "/preview?id=%C2%B2"):
+            self.assertEqual(get(bad)[0].status, 400, bad)
+        self.assertEqual(get("/preview?id=99999")[0].status, 404)
+        self.assertEqual(get("/api/search?q=quasar")[0].status, 200)
 
 
 class ServeCommandTests(unittest.TestCase):
