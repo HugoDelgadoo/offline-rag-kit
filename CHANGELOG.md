@@ -4,11 +4,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/) (0.x versions may change the CLI).
 
-## [Unreleased]
+## [0.1.3] - 2026-11-24
 
 ### Added
-- Optional semantic search with local Ollama embeddings: `offline-rag embed` (explicit step), `search`/`ask --mode vector|hybrid` (BM25 + vectors fused with Reciprocal Rank Fusion). Vectors are stored in the same SQLite file; only the standard library is used. `ingest` never calls Ollama and the default mode stays `lexical`.
+- Optional (experimental, not yet measured with a real model) semantic search with local Ollama embeddings: `offline-rag embed` (explicit step), `search`/`ask --mode vector|hybrid` (BM25 + vectors fused with Reciprocal Rank Fusion). Vectors are stored in the same SQLite file; only the standard library is used. `ingest` never calls Ollama and the default mode stays `lexical`.
 - `python -m offline_rag.eval --mode hybrid` to measure semantic retrieval on the bundled dataset.
+- Spanish README (`README.es.md`) with a language switch.
 - Evaluation set extended to 27 questions in four languages (hard paraphrases, multilingual and cross-lingual).
 - Design notes in `docs/DESIGN-hybrid-retrieval.md`.
 
@@ -74,6 +75,7 @@ First public alpha: a retrieval-first prototype for private, local document sear
 - Lexical search only; semantic/vector retrieval is planned (see [ROADMAP](ROADMAP.md)).
 - Single-user prototype, not a hardened multi-user service.
 
+[0.1.3]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.3
 [0.1.2]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.2
 [0.1.1]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.1
 [0.1.0]: https://github.com/HugoDelgadoo/offline-rag-kit/releases/tag/v0.1.0
