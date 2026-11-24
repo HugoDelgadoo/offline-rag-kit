@@ -76,6 +76,10 @@ python -m unittest discover -s tests -v
 
 See [ROADMAP](ROADMAP.md), [architecture](docs/ARCHITECTURE.md) and [contribution guide](CONTRIBUTING.md). Contributions, reproducible bug reports and small real-world test datasets (without confidential content) are welcome.
 
+## Maintainer
+
+Created and maintained by [@HugoDelgadoo](https://github.com/HugoDelgadoo). See the [changelog](CHANGELOG.md) for release notes.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
