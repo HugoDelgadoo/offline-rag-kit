@@ -23,6 +23,19 @@ Offline RAG Kit ayuda a encontrar evidencias en PDFs, Markdown y documentos de t
 - **Sin inferencia en la nube:** la generación opcional solo llama a `127.0.0.1:11434`.
 - **Una buena base:** la hoja de ruta incluye recuperación híbrida vectorial/BM25, OCR, audio, reordenación y evaluaciones automáticas.
 
+## Instalar en Windows (un solo script)
+
+Requisitos: Python 3.10 o superior ([python.org](https://www.python.org/downloads/), marca "Add python.exe to PATH"). No hacen falta permisos de administrador.
+
+1. Descarga [`install-windows.ps1`](https://github.com/HugoDelgadoo/offline-rag-kit/blob/main/scripts/install-windows.ps1) (ábrelo, léelo y usa el botón "Download raw file").
+2. Ejecútalo en PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-windows.ps1
+```
+
+Instala el programa en su propio entorno privado (tu Python no se modifica), añade el comando `offline-rag` al PATH (abre una terminal nueva después) y crea dos entradas en el menú Inicio: **Offline RAG** (abre la página web local) y **Offline RAG - index a folder** (pide una carpeta y la indexa). Para quitarlo todo, ejecuta `uninstall-windows.ps1`; tus documentos y tu índice se conservan.
+
 ## Inicio rápido (Windows PowerShell)
 
 Requisitos: Python 3.10 o superior.
