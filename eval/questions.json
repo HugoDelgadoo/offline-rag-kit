@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic evaluation set for offline-rag-kit. The corpus and questions were written for this project and are released under the repository's MIT license. Questions marked 'lexical' share words with the answer passage; 'paraphrase' ones deliberately do not, to expose the limits of BM25.",
+  "version": 1,
+  "questions": [
+    {"q": "How long are nightly backups kept?", "path": "backup-policy.md", "contains": "35 days", "kind": "lexical"},
+    {"q": "Which class must flights be booked in?", "path": "travel-expenses.md", "contains": "economy", "kind": "lexical"},
+    {"q": "How much is reimbursed per night for a hotel in a major city?", "path": "travel-expenses.md", "contains": "140 euros", "kind": "lexical"},
+    {"q": "How often must status page updates be posted for severity 1 incidents?", "path": "incident-response.md", "contains": "thirty minutes", "kind": "lexical"},
+    {"q": "Within how many working days is the postmortem written?", "path": "incident-response.md", "contains": "five working days", "kind": "lexical"},
+    {"q": "What security training must new hires complete?", "path": "onboarding.md", "contains": "security awareness", "kind": "lexical"},
+    {"q": "How long are server access logs retained?", "path": "data-retention.md", "contains": "ninety days", "kind": "lexical"},
+    {"q": "How long are customer invoices retained?", "path": "data-retention.md", "contains": "ten years", "kind": "lexical"},
+    {"q": "How long must a release candidate be tested in staging?", "path": "release-process.md", "contains": "24 hours", "kind": "lexical"},
+    {"q": "Who restores deleted files?", "path": "backup-policy.md", "contains": "infrastructure team", "kind": "lexical"},
+    {"q": "Can I get my meals paid for when travelling?", "path": "travel-expenses.md", "contains": "35 euros", "kind": "paraphrase"},
+    {"q": "What happens when a deployment goes badly wrong?", "path": "release-process.md", "contains": "rolls back", "kind": "paraphrase"},
+    {"q": "Who helps newcomers during their first months?", "path": "onboarding.md", "contains": "buddy", "kind": "paraphrase"},
+    {"q": "When must a person's private information be wiped?", "path": "data-retention.md", "contains": "erased within thirty days", "kind": "paraphrase"}
+  ]
+}

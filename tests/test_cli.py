@@ -31,7 +31,7 @@ class CliJsonTests(unittest.TestCase):
     def test_ingest_json_reports_skipped_files_without_stderr_noise(self):
         out, err = self.run_cli("--db", self.db, "--json", "ingest", str(self.docs))
         data = json.loads(out)
-        self.assertEqual((data["files"], data["passages"]), (1, 1))
+        self.assertEqual((data["files"], data["passages"], data["unchanged"]), (1, 1, 0))
         self.assertEqual([Path(s["path"]).name for s in data["skipped"]], ["bad.pdf"])
         self.assertEqual(err, "")
 

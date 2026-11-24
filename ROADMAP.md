@@ -10,11 +10,11 @@ This roadmap is a plan, not a claim that future capabilities already exist.
 - [x] Unit tests + GitHub Actions CI
 
 ## v0.2 — search correctness and useful maintenance
-- [ ] Delete stale entries when documents are removed
-- [ ] Filesystem content hashes and incremental indexing
+- [x] Delete stale entries when documents are removed
+- [x] Filesystem content hashes and incremental indexing
 - [ ] Better PDF paragraph/table extraction
-- [ ] Structured JSON output and benchmark queries
-- [ ] Error handling for encrypted or broken PDFs
+- [x] Structured JSON output and benchmark queries
+- [x] Error handling for encrypted or broken PDFs
 
 ## v0.3 — semantic and hybrid retrieval
 - [ ] Local embedding model and Qdrant option

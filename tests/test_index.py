@@ -1,8 +1,10 @@
 """Small, deterministic offline regression tests."""
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import pymupdf
 
@@ -23,8 +25,10 @@ class IndexTests(unittest.TestCase):
             "# Setup\n\nThe deployment uses local SQLite storage.\n\nSensitive PDFs stay offline.",
             encoding="utf-8",
         )
-        self.assertEqual(ingest(self.docs, self.db), (1, 3))
-        self.assertEqual(ingest(self.docs, self.db), (1, 3))
+        first = ingest(self.docs, self.db)
+        self.assertEqual((first.files, first.passages, first.unchanged), (1, 3, 0))
+        second = ingest(self.docs, self.db)
+        self.assertEqual((second.files, second.passages, second.unchanged), (1, 3, 1))
         results = search("SQLite", self.db)
         self.assertEqual(len(results), 1)
         self.assertIn("guide.md", citation(results[0]))
@@ -50,7 +54,8 @@ class IndexTests(unittest.TestCase):
         ingest(self.docs, self.db)
         self.assertEqual(len(search("beta", self.db)), 1)
         gone.unlink()
-        self.assertEqual(ingest(self.docs, self.db), (1, 1))
+        result = ingest(self.docs, self.db)
+        self.assertEqual((result.files, result.passages), (1, 1))
         self.assertEqual(search("beta", self.db), [])
         self.assertEqual(len(search("alpha", self.db)), 1)
 
@@ -67,10 +72,9 @@ class IndexTests(unittest.TestCase):
         (self.docs / "good.md").write_text("good content", encoding="utf-8")
         (self.docs / "broken.pdf").write_bytes(b"not a real pdf")
         (self.docs / "latin.txt").write_bytes("caf\xe9".encode("latin-1"))
-        errors = []
-        counts = ingest(self.docs, self.db, on_error=lambda p, e: errors.append(p.name))
-        self.assertEqual(counts, (1, 1))
-        self.assertCountEqual(errors, ["broken.pdf", "latin.txt"])
+        result = ingest(self.docs, self.db)
+        self.assertEqual((result.files, result.passages), (1, 1))
+        self.assertCountEqual([p.name for p, _ in result.skipped], ["broken.pdf", "latin.txt"])
         self.assertEqual(len(search("good", self.db)), 1)
 
     def test_all_terms_rank_before_partial_matches(self):
@@ -130,6 +134,42 @@ class IndexTests(unittest.TestCase):
         hit = search("needle", self.db)[0]
         self.assertIn("**needle**", hit["snippet"])
         self.assertLess(len(hit["snippet"]), len(hit["body"]))
+
+    def test_unchanged_files_are_not_reparsed(self):
+        (self.docs / "a.md").write_text("stable text", encoding="utf-8")
+        ingest(self.docs, self.db)
+        with mock.patch("offline_rag.index.extract_passages", side_effect=AssertionError("re-parsed")):
+            result = ingest(self.docs, self.db)
+        self.assertEqual((result.files, result.unchanged, result.passages), (1, 1, 1))
+
+    def test_changed_content_is_reindexed_even_with_same_size_and_mtime(self):
+        path = self.docs / "a.md"
+        path.write_text("first version", encoding="utf-8")
+        ingest(self.docs, self.db)
+        stat = path.stat()
+        path.write_text("other version", encoding="utf-8")  # same length
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
+        result = ingest(self.docs, self.db)
+        self.assertEqual(result.unchanged, 0)
+        self.assertEqual(search("first", self.db), [])
+        self.assertEqual(len(search("other", self.db)), 1)
+
+    def test_touched_but_identical_file_stays_unchanged(self):
+        path = self.docs / "a.md"
+        path.write_text("same bytes", encoding="utf-8")
+        ingest(self.docs, self.db)
+        stat = path.stat()
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
+        self.assertEqual(ingest(self.docs, self.db).unchanged, 1)
+
+    def test_failed_reparse_keeps_previous_passages(self):
+        path = self.docs / "a.md"
+        path.write_text("keep me", encoding="utf-8")
+        ingest(self.docs, self.db)
+        path.write_bytes("caf\xe9 changed".encode("latin-1"))
+        result = ingest(self.docs, self.db)
+        self.assertEqual(len(result.skipped), 1)
+        self.assertEqual(len(search("keep", self.db)), 1)
 
 
 if __name__ == "__main__":

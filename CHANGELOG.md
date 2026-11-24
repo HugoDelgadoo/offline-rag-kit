@@ -16,11 +16,14 @@ First public alpha: a retrieval-first prototype for private, local document sear
 - PDF citations with 1-based page number and block bounding box (x0,y0,x1,y1).
 - `offline-rag ingest | search | ask` command line interface.
 - Optional answers from a local Ollama server (`127.0.0.1:11434`) using only retrieved passages.
+- `python -m offline_rag.eval` with a small bundled dataset (recall@k and MRR); baseline in `docs/EVALUATION.md`.
 - `--json` global flag for machine-readable output of all commands.
 - Unit tests, GitHub Actions CI (Python 3.10, 3.12, 3.13), and architecture, roadmap,
   security and contribution documents.
 
 ### Changed
+- `ingest` is incremental (size/mtime shortcut plus SHA-256); the CLI reports how many files were unchanged, and `ingest()` returns an `IngestResult`.
+- `ask` honours `OLLAMA_HOST` / `--ollama-host`; non-loopback hosts need `--allow-remote`.
 - Citations and `--json` paths are relative to the ingested folder; the index stores the root
   separately. Indexes from earlier builds must be rebuilt (a clear error says so).
 - `search` prints a snippet around the matching terms (`**term**`) and `--json` adds a `snippet` field.

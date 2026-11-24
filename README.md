@@ -48,7 +48,12 @@ The `ask` command uses a **local** Ollama server only. It cannot guarantee the m
 offline-rag [--db PATH] [--json] ingest FOLDER
 offline-rag [--db PATH] [--json] search "TERMS" [--limit 5]
 offline-rag [--db PATH] [--json] ask "QUESTION" [--limit 5] [--model llama3.2]
+                                     [--ollama-host URL] [--allow-remote]
 ```
+
+Re-running `ingest` is incremental: unchanged files (by content hash) are not re-parsed.
+
+`ask` talks to `127.0.0.1:11434` by default. Set `OLLAMA_HOST` or `--ollama-host` to use another port. Non-loopback hosts are refused unless you pass `--allow-remote`, because retrieved passages would then leave your machine.
 
 `--json` (placed before the subcommand) prints a single JSON document on stdout, with the full passage text, page, bounding box and score for each hit. Errors and exit codes are unchanged and still go to stderr.
 
@@ -65,7 +70,15 @@ offline-rag [--db PATH] [--json] ask "QUESTION" [--limit 5] [--model llama3.2]
 | Web dashboard / user authentication | Planned |
 | Reliable claim-level grounding evaluation | Planned |
 
-The first version **does not** OCR scanned PDFs or interpret PDF tables reliably. Each PDF text block is a retrieval unit, so coordinates describe blocks rather than arbitrary answer spans. Changed files are refreshed on re-ingest; deleted files currently require rebuilding the index. This is a single-user developer prototype, not a hardened multi-user service.
+The first version **does not** OCR scanned PDFs or interpret PDF tables reliably. Each PDF text block is a retrieval unit, so coordinates describe blocks rather than arbitrary answer spans. Changed files are refreshed on re-ingest and deleted files are removed from the index. This is a single-user developer prototype, not a hardened multi-user service.
+
+## Evaluation
+
+```powershell
+python -m offline_rag.eval
+```
+
+Measures recall@k and MRR on a small bundled dataset (`eval/`). See [docs/EVALUATION.md](docs/EVALUATION.md) for the current baseline.
 
 ## Development
 

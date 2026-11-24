@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--limit", type=int, default=5)
         if command == "ask":
             sub.add_argument("--model", default="llama3.2", help="Ollama model installed locally")
+            sub.add_argument("--ollama-host", help="Ollama URL (default: $OLLAMA_HOST or 127.0.0.1:11434)")
+            sub.add_argument(
+                "--allow-remote", action="store_true",
+                help="Allow a non-loopback Ollama host (retrieved passages are sent to it)",
+            )
     return parser
 
 
@@ -51,18 +56,20 @@ def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "ingest":
-            skipped = []
-
-            def warn(path, exc):
-                skipped.append({"path": str(path), "error": str(exc)})
-                if not args.json:
-                    print(f"Warning: skipped {path}: {exc}", file=sys.stderr)
-
-            files, passages = ingest(args.folder, args.db, on_error=warn)
+            result = ingest(args.folder, args.db)
+            skipped = [{"path": str(p), "error": str(e)} for p, e in result.skipped]
             if args.json:
-                _dump({"files": files, "passages": passages, "database": args.db, "skipped": skipped})
+                _dump({
+                    "files": result.files, "passages": result.passages,
+                    "unchanged": result.unchanged, "database": args.db, "skipped": skipped,
+                })
             else:
-                print(f"Indexed {files} files and {passages} passages in {args.db}")
+                for item in skipped:
+                    print(f"Warning: skipped {item['path']}: {item['error']}", file=sys.stderr)
+                print(
+                    f"Indexed {result.files} files ({result.unchanged} unchanged) and "
+                    f"{result.passages} passages in {args.db}"
+                )
         else:
             hits = search(args.query, args.db, args.limit)
             if args.command == "search":
@@ -74,7 +81,10 @@ def main(argv: list[str] | None = None) -> None:
                     for rank, hit in enumerate(hits, start=1):
                         print(f"\n[{rank}] {citation(hit)}\n{hit['snippet']}")
             else:
-                answer = answer_with_ollama(args.query, hits, model=args.model)
+                answer = answer_with_ollama(
+                    args.query, hits, model=args.model,
+                    host=args.ollama_host, allow_remote=args.allow_remote,
+                )
                 if args.json:
                     _dump({
                         "question": args.query,

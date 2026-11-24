@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sqlite3
 from contextlib import closing
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -36,6 +38,13 @@ def open_index(database: str | Path) -> sqlite3.Connection:
             tokenize = 'unicode61 remove_diacritics 2'
         )"""
     )
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS files (
+            root TEXT NOT NULL, path TEXT NOT NULL,
+            size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, sha256 TEXT NOT NULL,
+            PRIMARY KEY (root, path)
+        )"""
+    )
     return connection
 
 
@@ -60,17 +69,33 @@ def extract_passages(path: Path) -> Iterator[tuple[int, str, str]]:
                 yield 0, "", body
 
 
-def ingest(
-    folder: str | Path,
-    database: str | Path,
-    on_error: Callable[[Path, Exception], None] | None = None,
-) -> tuple[int, int]:
-    """Index all documents recursively; re-ingesting a file replaces its passages.
+@dataclass
+class IngestResult:
+    """Outcome of :func:`ingest`. ``files``/``passages`` count everything now in the index
+    for the folder; ``unchanged`` of those files were skipped because their content did not change."""
 
-    Files that cannot be read (corrupt or encrypted PDFs, non-UTF-8 text) are
-    skipped and reported through ``on_error``; their previous passages, if any,
-    are kept. Passages of files that no longer exist under ``folder`` are removed.
-    Returns (files indexed, passages indexed).
+    files: int = 0
+    passages: int = 0
+    unchanged: int = 0
+    skipped: list[tuple[Path, Exception]] = field(default_factory=list)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def ingest(folder: str | Path, database: str | Path) -> IngestResult:
+    """Index all documents recursively and incrementally.
+
+    Files whose content hash is unchanged since the last run are not re-parsed;
+    changed files replace their old passages. Files that cannot be read (corrupt or
+    encrypted PDFs, non-UTF-8 text) are reported in ``result.skipped`` and keep their
+    previous passages, if any. Passages of files that no longer exist under ``folder``
+    (or of folders that no longer exist) are removed.
     """
     root = Path(folder).expanduser().resolve()
     if not root.is_dir():
@@ -79,35 +104,59 @@ def ingest(
         path for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
     )
-    file_count = 0
-    passage_count = 0
+    result = IngestResult()
     root_key = str(root)
     with closing(open_index(database)) as connection:
         for path in documents:
             relative = path.relative_to(root).as_posix()
             try:
+                stat = path.stat()
+                known = connection.execute(
+                    "SELECT size, mtime_ns, sha256 FROM files WHERE root = ? AND path = ?",
+                    (root_key, relative),
+                ).fetchone()
+                if known and (known["size"], known["mtime_ns"]) == (stat.st_size, stat.st_mtime_ns):
+                    digest = known["sha256"]  # same size and mtime: trust it, skip hashing
+                else:
+                    digest = _sha256(path)
+                if known and known["sha256"] == digest:
+                    count = connection.execute(
+                        "SELECT COUNT(*) FROM passages WHERE root = ? AND path = ?", (root_key, relative)
+                    ).fetchone()[0]
+                    with connection:
+                        connection.execute(
+                            "UPDATE files SET size = ?, mtime_ns = ? WHERE root = ? AND path = ?",
+                            (stat.st_size, stat.st_mtime_ns, root_key, relative),
+                        )
+                    result.files += 1
+                    result.unchanged += 1
+                    result.passages += count
+                    continue
                 entries = list(extract_passages(path))
             except Exception as exc:  # parsers raise many different error types
-                if on_error:
-                    on_error(path, exc)
+                result.skipped.append((path, exc))
                 continue
             with connection:
-                connection.execute(
-                    "DELETE FROM passages WHERE root = ? AND path = ?", (root_key, relative)
-                )
+                connection.execute("DELETE FROM passages WHERE root = ? AND path = ?", (root_key, relative))
                 connection.executemany(
                     "INSERT INTO passages (root, path, page, bbox, body) VALUES (?, ?, ?, ?, ?)",
                     ((root_key, relative, page, bbox, body) for page, bbox, body in entries),
                 )
-            file_count += 1
-            passage_count += len(entries)
+                connection.execute(
+                    "INSERT OR REPLACE INTO files (root, path, size, mtime_ns, sha256) VALUES (?, ?, ?, ?, ?)",
+                    (root_key, relative, stat.st_size, stat.st_mtime_ns, digest),
+                )
+            result.files += 1
+            result.passages += len(entries)
         _remove_stale(connection, root_key, {p.relative_to(root).as_posix() for p in documents})
-    return file_count, passage_count
+    return result
 
 
 def _remove_stale(connection: sqlite3.Connection, root_key: str, present: set[str]) -> None:
-    """Delete passages of removed files, and of folders that no longer exist (moved/renamed)."""
-    rows = connection.execute("SELECT DISTINCT root, path FROM passages").fetchall()
+    """Delete data of removed files, and of folders that no longer exist (moved/renamed)."""
+    rows = connection.execute(
+        "SELECT root, path FROM passages UNION SELECT root, path FROM files"
+    ).fetchall()
     stale = [
         (row["root"], row["path"])
         for row in rows
@@ -116,6 +165,7 @@ def _remove_stale(connection: sqlite3.Connection, root_key: str, present: set[st
     ]
     with connection:
         connection.executemany("DELETE FROM passages WHERE root = ? AND path = ?", stale)
+        connection.executemany("DELETE FROM files WHERE root = ? AND path = ?", stale)
 
 
 def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
