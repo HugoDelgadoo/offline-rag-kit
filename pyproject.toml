@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "offline-rag-kit"
+version = "0.1.0"
+description = "Privacy-first local document search with PDF citations and optional Ollama answers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Offline RAG Kit contributors"}]
+dependencies = ["PyMuPDF>=1.24,<2"]
+keywords = ["rag", "search", "privacy", "pdf", "ollama", "local-first"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Text Processing :: Indexing",
+]
+
+[project.scripts]
+offline-rag = "offline_rag.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
