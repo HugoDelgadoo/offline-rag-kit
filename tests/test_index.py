@@ -73,6 +73,30 @@ class IndexTests(unittest.TestCase):
         self.assertCountEqual(errors, ["broken.pdf", "latin.txt"])
         self.assertEqual(len(search("good", self.db)), 1)
 
+    def test_all_terms_rank_before_partial_matches(self):
+        (self.docs / "a.md").write_text(
+            "local local local local search\n\nlocal search engine for private documents",
+            encoding="utf-8",
+        )
+        (self.docs / "b.md").write_text("search search search search", encoding="utf-8")
+        ingest(self.docs, self.db)
+        results = search("private search", self.db, limit=5)
+        self.assertIn("private", results[0]["body"])  # contains both terms
+        self.assertGreater(len(results), 1)  # partial matches fill the rest
+        self.assertEqual(len({r["body"] for r in results}), len(results))  # no duplicates
+
+    def test_and_only_when_enough_results(self):
+        (self.docs / "a.md").write_text("red apple\n\nred car\n\napple pie", encoding="utf-8")
+        ingest(self.docs, self.db)
+        results = search("red apple", self.db, limit=1)
+        self.assertEqual(results[0]["body"], "red apple")
+        self.assertEqual(len(results), 1)
+
+    def test_repeated_terms_and_operators_are_safe(self):
+        (self.docs / "a.md").write_text("sqlite sqlite storage", encoding="utf-8")
+        ingest(self.docs, self.db)
+        self.assertEqual(len(search("sqlite sqlite NOT AND OR storage", self.db)), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

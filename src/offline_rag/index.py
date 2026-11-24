@@ -103,23 +103,43 @@ def _remove_stale(connection: sqlite3.Connection, root: Path, present: set[str])
 
 
 def search(query: str, database: str | Path, limit: int = 5) -> list[dict]:
+    """Rank passages with BM25, preferring passages that contain every term.
+
+    Passages matching all query terms (AND) come first; if there are fewer than
+    ``limit`` of them, the remaining slots are filled with passages matching any
+    term (OR), so multi-word queries stay precise without losing recall.
+    """
     if limit < 1 or limit > 100:
         raise ValueError("limit must be between 1 and 100")
-    tokens = re.findall(r"\w+", query, flags=re.UNICODE)
+    tokens = list(dict.fromkeys(re.findall(r"\w+", query, flags=re.UNICODE)))
     if not tokens:
         return []
     # Quoting every user token avoids injecting FTS5 operators or syntax.
-    fts_query = " OR ".join(f'"{token}"' for token in tokens)
+    quoted = [f'"{token}"' for token in tokens]
+    modes = [" AND ".join(quoted)]
+    if len(quoted) > 1:
+        modes.append(" OR ".join(quoted))
+    results: list[dict] = []
+    seen: set[int] = set()
     with closing(open_index(database)) as connection:
-        rows = connection.execute(
-            """SELECT path, page, bbox, body, bm25(passages) AS score
-               FROM passages
-               WHERE passages MATCH ?
-               ORDER BY score ASC
-               LIMIT ?""",
-            (fts_query, limit),
-        ).fetchall()
-    return [dict(row) for row in rows]
+        for fts_query in modes:
+            rows = connection.execute(
+                """SELECT rowid, path, page, bbox, body, bm25(passages) AS score
+                   FROM passages
+                   WHERE passages MATCH ?
+                   ORDER BY score ASC
+                   LIMIT ?""",
+                (fts_query, limit),
+            ).fetchall()
+            for row in rows:
+                if row["rowid"] not in seen and len(results) < limit:
+                    seen.add(row["rowid"])
+                    hit = dict(row)
+                    del hit["rowid"]
+                    results.append(hit)
+            if len(results) >= limit:
+                break
+    return results
 
 
 def citation(result: dict) -> str:
